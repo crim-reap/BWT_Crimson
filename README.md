@@ -34,53 +34,51 @@ this project aims to intercept and block suspicious transactions within sub-300 
 We use the IEEE-CIS Fraud Detection dataset (Kaggle) to train our models.
 
 The dataset includes:
+- Transaction-level data (amount, time, card type, billing match)
 
-Transaction-level data (amount, time, card type, billing match)
+- Identity-level data (device type, browser, IP patterns, email domain)
 
-Identity-level data (device type, browser, IP patterns, email domain)
+- The model learns patterns that differentiate:
 
-The model learns patterns that differentiate:
-
-Normal transactions
-
-Fraudulent transactions
+  - Normal transactions
+  - Fraudulent transactions
 
 ### 2. Machine Learning Pipeline
    
-Step 1 — Data Cleaning
+Step 1: Data Cleaning
 
-Handle missing values
+- Handle missing values
 
-Remove irrelevant columns
+- Remove irrelevant columns
 
-Step 2 — Feature Engineering
+Step 2: Feature Engineering
 
-We create intelligent behavioral signals such as:
+- We create intelligent behavioral signals such as:
 
-Time since last transaction
+- Time since last transaction
 
-Rapid transaction frequency
+- Rapid transaction frequency
 
-Step 3 — Handling Imbalanced Data
+Step 3: Handling Imbalanced Data
 
-Since fraud cases are rare (~3%), we use:
+- Since fraud cases are rare (~3%), we use:
 
-Class weighting in XGBoost
+- Class weighting in XGBoost
 
 OR
 
-SMOTE (Synthetic Minority Oversampling Technique)
+- SMOTE (Synthetic Minority Oversampling Technique)
 
 This ensures the model does not ignore fraud cases.
 
 
-Step 4 — Risk Scoring & Threshold Optimization
+Step 4: Risk Scoring & Threshold Optimization
 
-We tune decision thresholds to:
+- We tune decision thresholds to:
 
-Minimize false positives
+- Minimize false positives
 
-Maintain high fraud detection recall
+- Maintain high fraud detection recall
 
 
 
