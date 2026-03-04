@@ -9,7 +9,20 @@
 # The script automatically finds the 'data' folder relative to this file.
 
 from pathlib import Path  # Path helps us work with file paths in a simple way
+import os
 import pandas as pd       # pandas helps us load, merge, and analyze tabular data
+
+
+def _make_out(notebooks_dir: Path):
+    log_path = notebooks_dir / "explore_data_run.log"
+
+    def out(obj=""):
+        s = str(obj)
+        print(s)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(s + "\n")
+
+    return out
 
 
 def main():
@@ -20,6 +33,7 @@ def main():
 
     # The 'notebooks' folder is this script's parent directory.
     notebooks_dir = script_path.parent
+    out = _make_out(notebooks_dir)
 
     # The project root is one level up from 'notebooks'.
     project_root = notebooks_dir.parent
@@ -37,16 +51,20 @@ def main():
     # 2) Load the CSV files into pandas DataFrames.
     # A DataFrame is like a table in memory that we can analyze.
     # Make sure the CSV files exist in the 'data' folder before running this.
-    print(f"Loading: {transaction_path}")
-    train_transaction = pd.read_csv(transaction_path)
+    sample_rows = os.getenv("SAMPLE_ROWS")
+    # Default to a sample for quicker runs in constrained environments.
+    nrows = int(sample_rows) if sample_rows else 50000
+    out(f"Sampling first {nrows} rows for quick run")
+    out(f"Loading: {transaction_path}")
+    train_transaction = pd.read_csv(transaction_path, nrows=nrows)
 
-    print(f"Loading: {identity_path}")
+    out(f"Loading: {identity_path}")
     train_identity = pd.read_csv(identity_path)
 
     # 3) Merge the two DataFrames on the 'TransactionID' column.
     # A "left" join keeps all rows from the left table (train_transaction)
     # and matches rows from the right table (train_identity) when possible.
-    print("Merging on 'TransactionID' with a left join...")
+    out("Merging on 'TransactionID' with a left join...")
     merged = pd.merge(
         train_transaction,
         train_identity,
@@ -56,33 +74,32 @@ def main():
 
     # 4) Print the shape (rows, columns) of the merged data.
     # This tells us how big the table is after merging.
-    print("\nMerged dataset shape (rows, columns):")
-    print(merged.shape)
+    out("\nMerged dataset shape (rows, columns):")
+    out(merged.shape)
 
     # 5) Show the first 5 rows to get a quick look at the data.
-    print("\nFirst 5 rows of the merged dataset:")
-    print(merged.head(5))
+    out("\nFirst 5 rows of the merged dataset:")
+    out(merged.head(5))
 
     # 6) Count how many missing values each column has.
     # isna() returns True where values are missing, and sum() counts them.
-    print("\nMissing values per column:")
+    out("\nMissing values per column:")
     missing_counts = merged.isna().sum()
-    print(missing_counts)
+    out(missing_counts)
 
     # 7) Calculate and print the percentage of transactions that are fraud.
     # The 'isFraud' column should be 1 for fraud and 0 for not fraud.
     # Taking the mean of a 0/1 column gives the fraction of 1s.
-    print("\nPercentage of transactions that are fraud:")
+    out("\nPercentage of transactions that are fraud:")
     fraud_percentage = merged["isFraud"].mean() * 100
-    print(f"{fraud_percentage:.2f}%")
+    out(f"{fraud_percentage:.2f}%")
 
     # 8) Save the merged DataFrame to a new CSV file.
     # index=False prevents pandas from writing row numbers into the file.
-    print(f"\nSaving merged dataset to: {output_path}")
+    out(f"\nSaving merged dataset to: {output_path}")
     merged.to_csv(output_path, index=False)
-    print("Save complete.")
+    out("Save complete.")
 
 
 if __name__ == "__main__":
     main()
-
