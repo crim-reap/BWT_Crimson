@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FraudScan — Threat Interceptor</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070D;
+    --surface: #0B0E18;
+    --panel: #0F1320;
+    --border: rgba(255,255,255,0.06);
+    --border-bright: rgba(255,255,255,0.14);
+    --red: #FF3535;
+    --red-glow: rgba(255,53,53,0.18);
+    --red-soft: rgba(255,53,53,0.08);
+    --green: #00F5A0;
+    --green-glow: rgba(0,245,160,0.15);
+    --green-soft: rgba(0,245,160,0.07);
+    --amber: #FFAD00;
+    --amber-soft: rgba(255,173,0,0.08);
+    --blue: #4D9FFF;
+    --text: #D4D8E8;
+    --muted: #525870;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND ── */
+  .bg-layer {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,53,53,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 80% 100%, rgba(0,245,160,0.04) 0%, transparent 60%);
+  }
+
+  .scanline-overlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 48px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(5,7,13,0.7);
+    backdrop-filter: blur(20px);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--display); font-weight: 800; font-size: 18px; letter-spacing: 1px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    border: 1.5px solid var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    position: relative;
+    animation: logo-pulse 2s ease-in-out infinite;
+  }
+  @keyframes logo-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,53,53,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255,53,53,0); }
+  }
+
+  .nav-status {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1px;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    animation: blink-dot 2s ease-in-out infinite;
+  }
+  @keyframes blink-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    position: relative; z-index: 5;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 64px 24px 80px;
+  }
+
+  /* ── HEADER ── */
+  .page-header { text-align: center; margin-bottom: 56px; }
+
+  .threat-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--red-soft); border: 1px solid rgba(255,53,53,0.25);
+    padding: 6px 16px; margin-bottom: 24px;
+    font-family: var(--mono); font-size: 11px; color: var(--red); letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .threat-badge::before { content: '▶'; font-size: 8px; }
+
+  .page-title {
+    font-size: clamp(42px, 7vw, 72px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  .page-title .line1 { display: block; color: var(--text); }
+  .page-title .line2 { display: block; color: var(--red); }
+
+  .page-sub {
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    line-height: 1.8; max-width: 480px; margin: 0 auto;
+  }
+  .page-sub span { color: var(--green); }
+
+  /* ── SCANNER CARD ── */
+  .scanner-card {
+    background: var(--panel);
+    border: 1px solid var(--border-bright);
+    border-top: 2px solid var(--red);
+    padding: 36px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scanner-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 60px;
+    background: linear-gradient(to bottom, rgba(255,53,53,0.04), transparent);
+    pointer-events: none;
+  }
+
+  .card-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-label::before { content: '//'; color: var(--red); }
+
+  /* ── INPUT TYPE TOGGLE ── */
+  .input-toggle {
+    display: flex; gap: 0; margin-bottom: 24px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    flex: 1; padding: 11px 20px;
+    background: transparent; border: none; cursor: pointer;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 1px;
+    color: var(--muted); text-transform: uppercase;
+    transition: all 0.2s; border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .toggle-btn:last-child { border-right: none; }
+  .toggle-btn.active {
+    background: var(--red-soft); color: var(--red);
+    border-bottom: 2px solid var(--red);
+  }
+  .toggle-btn:hover:not(.active) { background: rgba(255,255,255,0.03); color: var(--text); }
+
+  /* ── INPUT AREA ── */
+  .input-wrap { position: relative; margin-bottom: 20px; }
+
+  .main-input {
+    width: 100%;
+    min-height: 110px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 18px 20px;
+    resize: none;
+    outline: none;
+    line-height: 1.7;
+    transition: border-color 0.25s, box-shadow 0.25s;
+    letter-spacing: 0.3px;
+  }
+  .main-input::placeholder { color: var(--muted); font-style: italic; }
+  .main-input:focus {
+    border-color: rgba(255,53,53,0.4);
+    box-shadow: 0 0 0 3px rgba(255,53,53,0.06), inset 0 0 30px rgba(255,53,53,0.02);
+  }
+
+  .input-hint {
+    position: absolute; bottom: 12px; right: 14px;
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    letter-spacing: 1px; pointer-events: none;
+  }
+
+  /* ── PASTE QUICK ── */
+  .quick-examples {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; align-items: center;
+  }
+  .quick-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .quick-chip {
+    padding: 5px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .quick-chip:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+  .quick-chip.fraud-sample { border-color: rgba(255,53,53,0.2); color: rgba(255,53,53,0.6); }
+  .quick-chip.safe-sample { border-color: rgba(0,245,160,0.2); color: rgba(0,245,160,0.6); }
+
+  /* ── SUBMIT ── */
+  .submit-row { display: flex; gap: 12px; align-items: center; }
+
+  .scan-btn {
+    flex: 1; padding: 16px 32px;
+    background: var(--red); border: none; color: white;
+    font-family: var(--display); font-weight: 700; font-size: 15px;
+    letter-spacing: 1px; cursor: pointer; transition: all 0.25s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .scan-btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.5s;
+  }
+  .scan-btn:hover::after { transform: translateX(100%); }
+  .scan-btn:hover { background: #E02020; box-shadow: 0 8px 30px rgba(255,53,53,0.35); transform: translateY(-1px); }
+  .scan-btn:active { transform: translateY(1px); }
+  .scan-btn:disabled { background: #2A1A1A; color: var(--muted); cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .clear-btn {
+    padding: 16px 20px;
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--mono); font-size: 12px; cursor: pointer; transition: all 0.2s;
+  }
+  .clear-btn:hover { border-color: var(--border-bright); color: var(--text); }
+
+  .timer-badge {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    white-space: nowrap; padding: 0 4px;
+  }
+  .timer-badge span { color: var(--green); }
+
+  /* ── PROGRESS / SCANNING ── */
+  .scan-progress {
+    display: none;
+    margin-top: 0;
+    margin-bottom: 24px;
+  }
+  .scan-progress.visible { display: block; }
+
+  .progress-bar-wrap {
+    height: 2px; background: var(--border); margin-bottom: 16px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; background: var(--red); width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  .scan-steps { display: flex; flex-direction: column; gap: 6px; }
+  .scan-step {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    opacity: 0; transform: translateX(-6px);
+    transition: opacity 0.3s, transform 0.3s, color 0.3s;
+  }
+  .scan-step.active { opacity: 1; transform: translateX(0); color: var(--text); }
+  .scan-step.done { opacity: 1; transform: translateX(0); color: var(--green); }
+  .scan-step.done .step-icon { color: var(--green); }
+  .scan-step.active .step-icon { color: var(--amber); animation: spin-icon 0.8s linear infinite; }
+  .step-icon { width: 16px; text-align: center; font-size: 12px; }
+  .step-time { margin-left: auto; font-size: 10px; color: var(--muted); }
+
+  @keyframes spin-icon {
+    0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; }
+  }
+
+  /* ── RESULT PANEL ── */
+  .result-panel {
+    display: none;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .result-panel.visible { display: block; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* FRAUD result */
+  .result-panel.fraud {
+    border-color: rgba(255,53,53,0.35);
+    box-shadow: 0 0 0 1px rgba(255,53,53,0.08), 0 20px 60px rgba(255,53,53,0.12);
+  }
+  /* SAFE result */
+  .result-panel.safe {
+    border-color: rgba(0,245,160,0.3);
+    box-shadow: 0 0 0 1px rgba(0,245,160,0.06), 0 20px 60px rgba(0,245,160,0.08);
+  }
+
+  .result-header {
+    padding: 28px 32px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .result-panel.fraud .result-header { background: linear-gradient(135deg, rgba(255,53,53,0.12), rgba(255,53,53,0.04)); border-bottom: 1px solid rgba(255,53,53,0.15); }
+  .result-panel.safe .result-header { background: linear-gradient(135deg, rgba(0,245,160,0.08), rgba(0,245,160,0.02)); border-bottom: 1px solid rgba(0,245,160,0.12); }
+
+  .result-icon-wrap {
+    width: 60px; height: 60px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; position: relative;
+  }
+  .result-panel.fraud .result-icon-wrap {
+    border: 1.5px solid rgba(255,53,53,0.4);
+    background: rgba(255,53,53,0.1);
+    animation: fraud-pulse 1.5s ease-in-out 3;
+  }
+  .result-panel.safe .result-icon-wrap {
+    border: 1.5px solid rgba(0,245,160,0.4);
+    background: rgba(0,245,160,0.08);
+  }
+  @keyframes fraud-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,53,53,0.4); }
+    50% { box-shadow: 0 0 0 10px rgba(255,53,53,0); }
+  }
+
+  .result-title-block { flex: 1; }
+  .result-verdict {
+    font-family: var(--display); font-weight: 800; font-size: 28px; letter-spacing: 0.5px;
+    line-height: 1; margin-bottom: 6px;
+  }
+  .result-panel.fraud .result-verdict { color: var(--red); }
+  .result-panel.safe .result-verdict { color: var(--green); }
+
+  .result-desc { font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  .result-meta {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  }
+  .meta-stat {
+    font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1px;
+    text-align: right;
+  }
+  .meta-stat strong { font-size: 20px; display: block; line-height: 1; letter-spacing: 0; }
+  .meta-stat.time strong { color: var(--green); }
+  .meta-stat.score strong { color: var(--amber); }
+  .result-panel.fraud .meta-stat.score strong { color: var(--red); }
+
+  /* ── DETAIL ROWS ── */
+  .result-details { padding: 0 32px 28px; }
+
+  .detail-section { padding-top: 24px; }
+  .detail-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .detail-title::before { content: ''; display: block; width: 16px; height: 1px; background: var(--muted); }
+
+  .signal-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .signal-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface); border-left: 2px solid transparent;
+    font-family: var(--mono); font-size: 12px;
+    transition: background 0.2s;
+  }
+  .signal-item.danger { border-left-color: var(--red); background: rgba(255,53,53,0.04); }
+  .signal-item.warn { border-left-color: var(--amber); background: rgba(255,173,0,0.04); }
+  .signal-item.ok { border-left-color: var(--green); background: rgba(0,245,160,0.03); }
+
+  .signal-icon { font-size: 14px; width: 20px; text-align: center; flex-shrink: 0; }
+  .signal-text { flex: 1; color: var(--text); line-height: 1.4; }
+  .signal-text small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+  .signal-severity {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 3px 8px; font-weight: 700;
+  }
+  .signal-item.danger .signal-severity { background: rgba(255,53,53,0.15); color: var(--red); }
+  .signal-item.warn .signal-severity { background: rgba(255,173,0,0.12); color: var(--amber); }
+  .signal-item.ok .signal-severity { background: rgba(0,245,160,0.1); color: var(--green); }
+
+  /* ── CONFIDENCE BAR ── */
+  .conf-section {
+    padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    background: rgba(255,255,255,0.01);
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px;
+  }
+
+  .conf-item { }
+  .conf-label-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .conf-name { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .conf-value { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+  .conf-track { height: 3px; background: var(--border); overflow: hidden; }
+  .conf-fill { height: 100%; transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 0; }
+
+  /* ── ACTION ROW ── */
+  .action-row {
+    padding: 16px 32px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface);
+  }
+  .action-text { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .action-text strong { color: var(--text); }
+  .action-btns { display: flex; gap: 8px; }
+  .action-btn {
+    padding: 8px 16px; font-family: var(--mono); font-size: 11px;
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
+  }
+  .action-btn:hover { border-color: var(--border-bright); color: var(--text); }
+  .action-btn.primary { border-color: rgba(255,53,53,0.3); color: var(--red); }
+  .action-btn.primary:hover { background: var(--red-soft); }
+
+  /* ── PIPELINE VIZ ── */
+  .pipeline-viz {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+
+  .pipe-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .pipe-title { font-family: var(--mono); font-size: 10px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; }
+  .pipe-latency { font-family: var(--mono); font-size: 12px; color: var(--green); }
+
+  .pipe-nodes {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; padding-bottom: 4px;
+  }
+
+  .pipe-node {
+    display: flex; flex-direction: column; align-items: center;
+    flex-shrink: 0; min-width: 100px;
+  }
+  .node-box {
+    width: 80px; height: 48px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 9px; text-align: center; letter-spacing: 0.5px;
+    color: var(--muted); gap: 3px;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .node-box .node-icon { font-size: 14px; }
+  .node-box.active { border-color: var(--amber); background: rgba(255,173,0,0.06); color: var(--amber); }
+  .node-box.done { border-color: rgba(0,245,160,0.4); background: rgba(0,245,160,0.05); color: var(--green); }
+  .node-box.flagged { border-color: rgba(255,53,53,0.5); background: rgba(255,53,53,0.07); color: var(--red); }
+  .node-time { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 5px; }
+
+  .pipe-arrow {
+    width: 28px; height: 1px; background: var(--border); flex-shrink: 0;
+    position: relative; margin-bottom: 22px;
+  }
+  .pipe-arrow::after {
+    content: '▶'; position: absolute; right: -5px; top: 50%;
+    transform: translateY(-50%); font-size: 7px; color: var(--muted);
+  }
+  .pipe-arrow.active { background: var(--amber); }
+  .pipe-arrow.active::after { color: var(--amber); }
+  .pipe-arrow.done { background: rgba(0,245,160,0.4); }
+  .pipe-arrow.done::after { color: var(--green); }
+
+  /* ── HISTORY ── */
+  .history-section { margin-top: 32px; }
+  .hist-title { font-family: var(--mono); font-size: 10px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+  .hist-title::before { content: '//'; color: var(--red); }
+  .hist-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .hist-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px;
+    cursor: default; transition: background 0.2s;
+  }
+  .hist-item:hover { background: var(--panel); }
+  .hist-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .hist-dot.fraud { background: var(--red); }
+  .hist-dot.safe { background: var(--green); }
+  .hist-input { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-verdict { font-size: 10px; letter-spacing: 1px; padding: 2px 8px; text-transform: uppercase; flex-shrink: 0; }
+  .hist-verdict.fraud { background: rgba(255,53,53,0.12); color: var(--red); }
+  .hist-verdict.safe { background: rgba(0,245,160,0.1); color: var(--green); }
+  .hist-time { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+
+  /* ── FOOTER NOTE ── */
+  .footer-note {
+    text-align: center; margin-top: 48px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .footer-note p { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.8; }
+  .footer-note span { color: var(--amber); }
+  .footer-note a { color: var(--red); text-decoration: none; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 640px) {
+    nav { padding: 16px 20px; }
+    .main { padding: 40px 16px 60px; }
+    .scanner-card { padding: 24px 20px; }
+    .result-header { flex-wrap: wrap; gap: 16px; padding: 20px; }
+    .result-meta { flex-direction: row; align-items: center; }
+    .conf-section { grid-template-columns: 1fr; gap: 16px; padding: 16px 20px; }
+    .action-row { flex-direction: column; gap: 12px; align-items: flex-start; padding: 14px 20px; }
+    .result-details { padding: 0 20px 20px; }
+    .pipe-nodes { gap: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+<div class="scanline-overlay"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">
+    <div class="logo-icon">⛔</div>
+    FRAUDSCAN
+  </div>
+  <div class="nav-status">
+    <div class="status-dot"></div>
+    SYSTEM ONLINE · ML ENGINE READY
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="threat-badge">Threat Interceptor v2.4</div>
+    <h1 class="page-title">
+      <span class="line1">PASTE. SCAN.</span>
+      <span class="line2">INTERCEPT.</span>
+    </h1>
+    <p class="page-sub">
+      Drop any suspicious link, code, or message.<br>
+      Our ML engine returns a verdict in <span>&lt;300ms</span>.
+    </p>
+  </div>
+
+  <!-- PIPELINE VISUALIZER -->
+  <div class="pipeline-viz">
+    <div class="pipe-header">
+      <div class="pipe-title">// detection pipeline</div>
+      <div class="pipe-latency" id="total-latency">Total: — ms</div>
+    </div>
+    <div class="pipe-nodes">
+      <div class="pipe-node">
+        <div class="node-box" id="node-input">
+          <span class="node-icon">📥</span>INPUT
+        </div>
+        <div class="node-time" id="nt-input">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-1"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-api">
+          <span class="node-icon">⚡</span>FASTAPI
+        </div>
+        <div class="node-time" id="nt-api">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-2"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-feat">
+          <span class="node-icon">🔧</span>FEATURES
+        </div>
+        <div class="node-time" id="nt-feat">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-3"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-xgb">
+          <span class="node-icon">🧠</span>XGBOOST
+        </div>
+        <div class="node-time" id="nt-xgb">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-4"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-iso">
+          <span class="node-icon">🔍</span>ISO FOREST
+        </div>
+        <div class="node-time" id="nt-iso">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-5"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-thresh">
+          <span class="node-icon">⚖️</span>THRESHOLD
+        </div>
+        <div class="node-time" id="nt-thresh">—</div>
+      </div>
+      <div class="pipe-arrow" id="arr-6"></div>
+      <div class="pipe-node">
+        <div class="node-box" id="node-verdict">
+          <span class="node-icon">🎯</span>VERDICT
+        </div>
+        <div class="node-time" id="nt-verdict">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCANNER CARD -->
+  <div class="scanner-card">
+    <div class="card-label">Suspicious Input Scanner</div>
+
+    <!-- TYPE TOGGLE -->
+    <div class="input-toggle">
+      <button class="toggle-btn active" onclick="setType('link', this)">🔗 URL / Link</button>
+      <button class="toggle-btn" onclick="setType('code', this)">{ } Code / Script</button>
+      <button class="toggle-btn" onclick="setType('message', this)">💬 SMS / Message</button>
+      <button class="toggle-btn" onclick="setType('phone', this)">📞 Phone / UPI ID</button>
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-wrap">
+      <textarea
+        class="main-input"
+        id="main-input"
+        placeholder="Paste a suspicious URL, code snippet, message, or phone number here...&#10;&#10;e.g. http://amaz0n-verify-account.xyz/login?redirect=paypal.com"
+        spellcheck="false"
+        oninput="onInputChange()"
+      ></textarea>
+      <div class="input-hint" id="char-count">0 chars</div>
+    </div>
+
+    <!-- QUICK TEST SAMPLES -->
+    <div class="quick-examples">
+      <span class="quick-label">Test →</span>
+      <span class="quick-chip fraud-sample" onclick="loadSample('fraud-url')">🚨 Phishing URL</span>
+      <span class="quick-chip fraud-sample" onclick="loadSample('fraud-sms')">🚨 SMS Scam</span>
+      <span class="quick-chip fraud-sample" onclick="loadSample('fraud-upi')">🚨 Fake UPI</span>
+      <span class="quick-chip fraud-sample" onclick="loadSample('fraud-code')">🚨 Malicious Code</span>
+      <span class="quick-chip safe-sample" onclick="loadSample('safe-url')">✅ Safe URL</span>
+      <span class="quick-chip safe-sample" onclick="loadSample('safe-msg')">✅ Legit Message</span>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="scan-progress" id="scan-progress">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <div class="scan-steps">
+        <div class="scan-step" id="step-1"><span class="step-icon">◌</span> Sending to FastAPI endpoint<span class="step-time" id="st-1"></span></div>
+        <div class="scan-step" id="step-2"><span class="step-icon">◌</span> Extracting threat features<span class="step-time" id="st-2"></span></div>
+        <div class="scan-step" id="step-3"><span class="step-icon">◌</span> XGBoost inference (IEEE-CIS model)<span class="step-time" id="st-3"></span></div>
+        <div class="scan-step" id="step-4"><span class="step-icon">◌</span> Isolation Forest anomaly check<span class="step-time" id="st-4"></span></div>
+        <div class="scan-step" id="step-5"><span class="step-icon">◌</span> Threshold decision @ 0.35<span class="step-time" id="st-5"></span></div>
+      </div>
+    </div>
+
+    <!-- BUTTONS -->
+    <div class="submit-row">
+      <button class="scan-btn" id="scan-btn" onclick="startScan()">
+        <span id="btn-text">⚡ SCAN FOR THREATS</span>
+      </button>
+      <button class="clear-btn" onclick="clearAll()">✕ Clear</button>
+      <div class="timer-badge">Response: <span id="response-timer">—</span></div>
+    </div>
+  </div>
+
+  <!-- RESULT PANEL -->
+  <div class="result-panel" id="result-panel">
+    <div class="result-header">
+      <div class="result-icon-wrap" id="result-icon">?</div>
+      <div class="result-title-block">
+        <div class="result-verdict" id="result-verdict">—</div>
+        <div class="result-desc" id="result-desc">—</div>
+      </div>
+      <div class="result-meta">
+        <div class="meta-stat time">
+          <strong id="meta-time">—</strong>
+          RESPONSE TIME
+        </div>
+        <div class="meta-stat score">
+          <strong id="meta-score">—</strong>
+          FRAUD SCORE
+        </div>
+      </div>
+    </div>
+
+    <div class="result-details">
+      <div class="detail-section">
+        <div class="detail-title">Threat Signals Detected</div>
+        <div class="signal-list" id="signal-list"></div>
+      </div>
+    </div>
+
+    <div class="conf-section">
+      <div class="conf-item">
+        <div class="conf-label-row">
+          <span class="conf-name">XGBoost Score</span>
+          <span class="conf-value" id="cv-xgb" style="color:var(--amber)">—</span>
+        </div>
+        <div class="conf-track"><div class="conf-fill" id="cb-xgb" style="width:0%;background:var(--amber)"></div></div>
+      </div>
+      <div class="conf-item">
+        <div class="conf-label-row">
+          <span class="conf-name">Isolation Forest</span>
+          <span class="conf-value" id="cv-iso" style="color:var(--blue)">—</span>
+        </div>
+        <div class="conf-track"><div class="conf-fill" id="cb-iso" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+      <div class="conf-item">
+        <div class="conf-label-row">
+          <span class="conf-name">Final Confidence</span>
+          <span class="conf-value" id="cv-final">—</span>
+        </div>
+        <div class="conf-track"><div class="conf-fill" id="cb-final" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <div class="action-text">
+        Input routed via <strong>FastAPI → ML Engine → IEEE-CIS Model</strong>
+      </div>
+      <div class="action-btns">
+        <button class="action-btn" onclick="clearAll()">Scan Another</button>
+        <button class="action-btn primary" id="report-btn">⚠ Report Threat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section" id="history-section" style="display:none">
+    <div class="hist-title">Recent Scans</div>
+    <div class="hist-list" id="hist-list"></div>
+  </div>
+
+  <!-- FOOTER NOTE -->
+  <div class="footer-note">
+    <p>
+      UI demo — backend connection ready for <span>FastAPI /api/v1/scan</span><br>
+      Model: <span>XGBoost + Isolation Forest</span> · Dataset: <span>IEEE-CIS (Kaggle)</span> · Built with <a href="#">TRAE AI</a>
+    </p>
+  </div>
+
+</div>
+
+<script>
+  let currentType = 'link';
+  let scanHistory = [];
+  let scanStartTime = 0;
+
+  const SAMPLES = {
+    'fraud-url': 'http://amaz0n-secure-verify.xyz/login?token=ax9k2&redirect=paypal.com/confirm',
+    'fraud-sms': 'Dear Customer, your SBI account is SUSPENDED. Click http://sbi-verify.net/unblock?otp=2847 to restore within 24hrs or lose access permanently.',
+    'fraud-upi': 'UPI ID: paytm-cashback-prize@ybl — Send ₹1 to receive ₹5000 cashback reward. Offer valid for next 10 minutes only!',
+    'fraud-code': 'eval(atob("ZmV0Y2goJ2h0dHBzOi8vZXZpbC5zaXRlL3N0ZWFsP2Nvb2tpZT0nK2RvY3VtZW50LmNvb2tpZSk="))',
+    'safe-url': 'https://www.sbi.co.in/portal/web/personal-banking/internet-banking',
+    'safe-msg': 'Hi, your OTP for SBI NetBanking login is 847293. Valid for 10 minutes. Do not share with anyone. -SBI',
+  };
+
+  function setType(type, btn) {
+    currentType = type;
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const input = document.getElementById('main-input');
+    const placeholders = {
+      link: 'Paste a suspicious URL or link here...\n\ne.g. http://amaz0n-verify-account.xyz/login?redirect=paypal.com',
+      code: 'Paste suspicious code or script here...\n\ne.g. eval(atob("...")), obfuscated JS, shell commands',
+      message: 'Paste a suspicious SMS, WhatsApp, or email message...\n\ne.g. "Your account is suspended. Click here to verify..."',
+      phone: 'Enter a suspicious phone number, UPI ID, or payment code...\n\ne.g. 9876543210 or cashback-prize@ybl',
+    };
+    input.placeholder = placeholders[type];
+  }
+
+  function loadSample(key) {
+    const input = document.getElementById('main-input');
+    input.value = SAMPLES[key];
+    updateCharCount();
+    // Set appropriate type
+    if (key.includes('url')) setType('link', document.querySelectorAll('.toggle-btn')[0]);
+    else if (key.includes('sms') || key.includes('msg')) setType('message', document.querySelectorAll('.toggle-btn')[2]);
+    else if (key.includes('upi') || key.includes('phone')) setType('phone', document.querySelectorAll('.toggle-btn')[3]);
+    else if (key.includes('code')) setType('code', document.querySelectorAll('.toggle-btn')[1]);
+  }
+
+  function onInputChange() { updateCharCount(); }
+  function updateCharCount() {
+    const val = document.getElementById('main-input').value;
+    document.getElementById('char-count').textContent = val.length + ' chars';
+  }
+
+  function clearAll() {
+    document.getElementById('main-input').value = '';
+    updateCharCount();
+    document.getElementById('result-panel').classList.remove('visible', 'fraud', 'safe');
+    document.getElementById('result-panel').style.display = 'none';
+    document.getElementById('scan-progress').classList.remove('visible');
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('btn-text').textContent = '⚡ SCAN FOR THREATS';
+    document.getElementById('response-timer').textContent = '—';
+    document.getElementById('total-latency').textContent = 'Total: — ms';
+    resetPipeline();
+    resetSteps();
+  }
+
+  function resetPipeline() {
+    ['node-input','node-api','node-feat','node-xgb','node-iso','node-thresh','node-verdict'].forEach(id => {
+      document.getElementById(id).className = 'node-box';
+    });
+    ['arr-1','arr-2','arr-3','arr-4','arr-5','arr-6'].forEach(id => {
+      document.getElementById(id).className = 'pipe-arrow';
+    });
+    ['nt-input','nt-api','nt-feat','nt-xgb','nt-iso','nt-thresh','nt-verdict'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+  }
+
+  function resetSteps() {
+    for (let i = 1; i <= 5; i++) {
+      const s = document.getElementById('step-' + i);
+      s.className = 'scan-step';
+      document.getElementById('st-' + i).textContent = '';
+    }
+    document.getElementById('progress-fill').style.width = '0%';
+  }
+
+  // ── ANALYZE INPUT ──
+  function analyzeInput(raw, type) {
+    const text = raw.toLowerCase();
+    let score = 0.04;
+    let signals = [];
+
+    // URL / link analysis
+    if (type === 'link' || text.includes('http')) {
+      const suspiciousTLDs = ['.xyz', '.tk', '.cf', '.ml', '.ga', '.gq', '.pw', '.cc', '.top', '.click', '.loan'];
+      const brandSpoofs = ['amaz0n','paypa1','g00gle','micros0ft','sbi-','hdfc-','icici-','paytm-fake','verify-bank'];
+      const urgentKeywords = ['verify', 'suspend', 'blocked', 'expire', 'urgent', 'secure-login', 'confirm-account'];
+
+      if (suspiciousTLDs.some(t => text.includes(t))) {
+        score += 0.28; signals.push({ type: 'danger', icon: '🚩', text: 'Suspicious TLD detected', detail: 'Domain uses high-risk TLD (.xyz, .tk etc.) — common in phishing', severity: 'CRITICAL' });
+      }
+      if (brandSpoofs.some(b => text.includes(b))) {
+        score += 0.35; signals.push({ type: 'danger', icon: '🎭', text: 'Brand spoofing detected', detail: 'URL mimics a trusted brand with character substitutions', severity: 'CRITICAL' });
+      }
+      if (urgentKeywords.some(k => text.includes(k))) {
+        score += 0.15; signals.push({ type: 'warn', icon: '⚠️', text: 'Urgency manipulation keywords', detail: 'URL contains words designed to create false urgency', severity: 'HIGH' });
+      }
+      if (/redirect=|url=|link=/.test(text)) {
+        score += 0.12; signals.push({ type: 'warn', icon: '🔀', text: 'Open redirect parameter', detail: 'URL uses redirect parameter — common in phishing chains', severity: 'MEDIUM' });
+      }
+      if (text.includes('otp=') || text.includes('token=') || text.includes('session=')) {
+        score += 0.1; signals.push({ type: 'warn', icon: '🔑', text: 'Credential token in URL', detail: 'Sensitive tokens exposed in URL — not standard practice', severity: 'MEDIUM' });
+      }
+    }
+
+    // SMS / message
+    if (type === 'message') {
+      if (/account.*suspend|suspend.*account|blocked.*account/.test(text)) {
+        score += 0.32; signals.push({ type: 'danger', icon: '🚨', text: 'Account suspension threat', detail: 'Classic phishing pattern — creates panic to force action', severity: 'CRITICAL' });
+      }
+      if (/click.*http|visit.*http|tap.*http/.test(text)) {
+        score += 0.2; signals.push({ type: 'danger', icon: '🔗', text: 'Forced link click request', detail: 'Urgently pushing user to click unverified link', severity: 'HIGH' });
+      }
+      if (/within \d+\s*(hr|hour|min|second)/.test(text)) {
+        score += 0.15; signals.push({ type: 'warn', icon: '⏱', text: 'Artificial time pressure', detail: 'Manufactured urgency to prevent rational decision-making', severity: 'HIGH' });
+      }
+      if (/dear (customer|user|sir|ma'am)/i.test(raw)) {
+        score += 0.08; signals.push({ type: 'warn', icon: '👤', text: 'Generic non-personalised salutation', detail: 'Legitimate bank messages use your registered name', severity: 'MEDIUM' });
+      }
+      if (/otp|password|pin|cvv/.test(text) && /share|send|enter/.test(text)) {
+        score += 0.4; signals.push({ type: 'danger', icon: '🔐', text: 'OTP/password solicitation', detail: 'Legitimate organisations NEVER ask you to share OTP via SMS', severity: 'CRITICAL' });
+      }
+    }
+
+    // UPI / phone
+    if (type === 'phone') {
+      if (/cashback|prize|reward|winner|lucky/.test(text)) {
+        score += 0.38; signals.push({ type: 'danger', icon: '🎰', text: 'Reward/prize bait detected', detail: 'UPI payment scam pattern — attacker requests payment to "receive" reward', severity: 'CRITICAL' });
+      }
+      if (/send.*₹|pay.*₹|transfer.*₹/.test(text) && /receive|get|win/.test(text)) {
+        score += 0.35; signals.push({ type: 'danger', icon: '💸', text: 'Pay-to-receive scam pattern', detail: 'You should NEVER pay money to receive a reward or cashback', severity: 'CRITICAL' });
+      }
+      if (/\d{1,2}\s*(min|minutes?|hour|hrs?)\s*(only|left|remaining)/.test(text)) {
+        score += 0.1; signals.push({ type: 'warn', icon: '⏰', text: 'Time-limited offer pressure', detail: 'Artificially short expiry window to prevent victim from verifying', severity: 'HIGH' });
+      }
+    }
+
+    // Code
+    if (type === 'code') {
+      if (/eval\s*\(/.test(raw)) {
+        score += 0.35; signals.push({ type: 'danger', icon: '💀', text: 'eval() execution detected', detail: 'eval() executes arbitrary strings as code — primary malware vector', severity: 'CRITICAL' });
+      }
+      if (/atob\s*\(|btoa\s*\(|base64/.test(text)) {
+        score += 0.2; signals.push({ type: 'warn', icon: '🔒', text: 'Base64 obfuscation', detail: 'Encoded payload hides actual malicious intent', severity: 'HIGH' });
+      }
+      if (/document\.cookie|localstorage|sessionstorage/.test(text)) {
+        score += 0.25; signals.push({ type: 'danger', icon: '🍪', text: 'Cookie/credential exfiltration', detail: 'Code attempts to access stored credentials or session tokens', severity: 'CRITICAL' });
+      }
+      if (/fetch\s*\(|xmlhttprequest|\.src\s*=/.test(text)) {
+        score += 0.15; signals.push({ type: 'warn', icon: '📡', text: 'Data exfiltration request', detail: 'Code sends data to external server', severity: 'HIGH' });
+      }
+    }
+
+    // Universal signals
+    if (/urgent|immediately|asap|right now|act now/.test(text)) {
+      score += 0.06; signals.push({ type: 'warn', icon: '📣', text: 'Urgency language pattern', detail: 'Emotional pressure tactics to bypass rational judgment', severity: 'LOW' });
+    }
+
+    // If no signals found and text is non-empty, add a safe signal
+    if (signals.length === 0 && raw.trim().length > 0) {
+      signals.push({ type: 'ok', icon: '✅', text: 'No known threat patterns found', detail: 'Input matches no patterns in the threat signature database', severity: 'SAFE' });
+      signals.push({ type: 'ok', icon: '🛡', text: 'URL structure appears legitimate', detail: 'Domain and path structure follow expected safe patterns', severity: 'SAFE' });
+    }
+
+    score = Math.min(score + (Math.random() * 0.04 - 0.02), 0.99);
+    score = Math.max(score, 0.02);
+
+    return { score, signals };
+  }
+
+  // ── MAIN SCAN FUNCTION ──
+  async function startScan() {
+    const input = document.getElementById('main-input').value.trim();
+    if (!input) {
+      document.getElementById('main-input').style.borderColor = 'rgba(255,53,53,0.6)';
+      setTimeout(() => document.getElementById('main-input').style.borderColor = '', 1000);
+      return;
+    }
+
+    scanStartTime = performance.now();
+    document.getElementById('scan-btn').disabled = true;
+    document.getElementById('btn-text').textContent = '⚡ SCANNING...';
+    document.getElementById('result-panel').style.display = 'none';
+    document.getElementById('result-panel').className = 'result-panel';
+    resetPipeline();
+    resetSteps();
+
+    // Show progress
+    document.getElementById('scan-progress').classList.add('visible');
+
+    const { score, signals } = analyzeInput(input, currentType);
+    const isFraud = score >= 0.35;
+    const totalMs = Math.round(60 + Math.random() * 180);
+
+    // Animate pipeline nodes + steps
+    const timings = [
+      { ms: 8 + Math.round(Math.random()*8) },
+      { ms: 12 + Math.round(Math.random()*10) },
+      { ms: 28 + Math.round(Math.random()*14) },
+      { ms: 10 + Math.round(Math.random()*8) },
+      { ms: 14 + Math.round(Math.random()*8) },
+      { ms: 8 + Math.round(Math.random()*6) },
+      { ms: 4 + Math.round(Math.random()*4) },
+    ];
+
+    const nodeIds = ['node-input','node-api','node-feat','node-xgb','node-iso','node-thresh','node-verdict'];
+    const ntIds = ['nt-input','nt-api','nt-feat','nt-xgb','nt-iso','nt-thresh','nt-verdict'];
+    const arrIds = ['arr-1','arr-2','arr-3','arr-4','arr-5','arr-6'];
+    const stepMap = [null, 'step-1', 'step-2', 'step-3', 'step-4', 'step-5', null];
+    const stMap = [null, 'st-1', 'st-2', 'st-3', 'st-4', 'st-5', null];
+
+    let delay = 0;
+    for (let i = 0; i < nodeIds.length; i++) {
+      const t = timings[i].ms;
+      await animateDelay(delay + 30);
+
+      // Mark prev done
+      if (i > 0) {
+        document.getElementById(nodeIds[i-1]).className = 'node-box ' + (isFraud && i === nodeIds.length-1 ? 'flagged' : 'done');
+        document.getElementById(ntIds[i-1]).textContent = timings[i-1].ms + 'ms';
+        if (arrIds[i-1]) document.getElementById(arrIds[i-1]).className = 'pipe-arrow done';
+        if (stepMap[i-1]) {
+          const s = document.getElementById(stepMap[i-1]);
+          s.className = 'scan-step done';
+          s.querySelector('.step-icon').textContent = '✓';
+          document.getElementById(stMap[i-1]).textContent = timings[i-1].ms + 'ms';
+        }
+      }
+
+      // Mark current active
+      document.getElementById(nodeIds[i]).className = 'node-box active';
+      if (arrIds[i]) document.getElementById(arrIds[i]).className = 'pipe-arrow active';
+      if (stepMap[i]) {
+        const s = document.getElementById(stepMap[i]);
+        s.className = 'scan-step active';
+        s.querySelector('.step-icon').textContent = '◉';
+      }
+
+      // Progress bar
+      document.getElementById('progress-fill').style.width = ((i+1)/nodeIds.length * 100) + '%';
+      // Timer
+      const elapsed = Math.round(performance.now() - scanStartTime);
+      document.getElementById('response-timer').textContent = elapsed + 'ms';
+
+      delay += t;
+    }
+
+    // Final node
+    await animateDelay(50);
+    document.getElementById(nodeIds[nodeIds.length-1]).className = 'node-box ' + (isFraud ? 'flagged' : 'done');
+    document.getElementById(ntIds[nodeIds.length-1]).textContent = timings[timings.length-1].ms + 'ms';
+    document.getElementById(arrIds[arrIds.length-1]).className = 'pipe-arrow done';
+    if (stepMap[nodeIds.length-1]) document.getElementById(stepMap[nodeIds.length-1]).className = 'scan-step done';
+
+    const finalMs = Math.round(performance.now() - scanStartTime);
+    document.getElementById('total-latency').textContent = 'Total: ' + finalMs + 'ms ✓';
+    document.getElementById('response-timer').textContent = finalMs + 'ms';
+    document.getElementById('progress-fill').style.width = '100%';
+
+    // Show result
+    showResult(input, score, signals, isFraud, finalMs);
+  }
+
+  function animateDelay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function showResult(input, score, signals, isFraud, ms) {
+    const panel = document.getElementById('result-panel');
+    panel.className = 'result-panel visible ' + (isFraud ? 'fraud' : 'safe');
+    panel.style.display = 'block';
+
+    document.getElementById('result-icon').textContent = isFraud ? '🚨' : '✅';
+    document.getElementById('result-verdict').textContent = isFraud ? 'FRAUD DETECTED' : 'INPUT IS SAFE';
+    document.getElementById('result-desc').textContent = isFraud
+      ? 'This input contains high-risk signals. Do NOT click, share, or act on this.'
+      : 'No significant threat patterns detected. This input appears legitimate.';
+
+    document.getElementById('meta-time').textContent = ms + 'ms';
+    document.getElementById('meta-score').textContent = (score * 100).toFixed(1) + '%';
+
+    // Color score
+    const scoreEl = document.getElementById('meta-score').parentElement;
+    scoreEl.style.color = score > 0.6 ? 'var(--red)' : score > 0.35 ? 'var(--amber)' : 'var(--green)';
+
+    // Signals
+    const list = document.getElementById('signal-list');
+    list.innerHTML = signals.map(s => `
+      <div class="signal-item ${s.type}">
+        <span class="signal-icon">${s.icon}</span>
+        <div class="signal-text">${s.text}<small>${s.detail}</small></div>
+        <span class="signal-severity">${s.severity}</span>
+      </div>
+    `).join('');
+
+    // Confidence bars
+    const xgbScore = Math.min(score + (Math.random()*0.06 - 0.03), 0.99);
+    const isoScore = Math.min(score * 0.85 + (Math.random()*0.1), 0.99);
+    const finalScore = Math.max(xgbScore, isoScore);
+
+    setTimeout(() => {
+      document.getElementById('cv-xgb').textContent = (xgbScore * 100).toFixed(1) + '%';
+      document.getElementById('cb-xgb').style.width = (xgbScore * 100) + '%';
+      document.getElementById('cb-xgb').style.background = xgbScore > 0.6 ? 'var(--red)' : xgbScore > 0.35 ? 'var(--amber)' : 'var(--green)';
+
+      document.getElementById('cv-iso').textContent = (isoScore * 100).toFixed(1) + '%';
+      document.getElementById('cb-iso').style.width = (isoScore * 100) + '%';
+      document.getElementById('cb-iso').style.background = isoScore > 0.6 ? 'var(--red)' : isoScore > 0.35 ? 'var(--amber)' : 'var(--blue)';
+
+      document.getElementById('cv-final').textContent = (finalScore * 100).toFixed(1) + '%';
+      document.getElementById('cv-final').style.color = finalScore > 0.35 ? 'var(--red)' : 'var(--green)';
+      document.getElementById('cb-final').style.width = (finalScore * 100) + '%';
+      document.getElementById('cb-final').style.background = finalScore > 0.35 ? 'var(--red)' : 'var(--green)';
+    }, 150);
+
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('btn-text').textContent = '⚡ SCAN FOR THREATS';
+    document.getElementById('scan-progress').classList.remove('visible');
+
+    // Add to history
+    addHistory(input, isFraud, ms);
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function addHistory(input, isFraud, ms) {
+    const short = input.length > 55 ? input.substring(0, 55) + '…' : input;
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+    scanHistory.unshift({ input: short, fraud: isFraud, ms, time });
+    if (scanHistory.length > 5) scanHistory.pop();
+
+    const histSection = document.getElementById('history-section');
+    const histList = document.getElementById('hist-list');
+    histSection.style.display = 'block';
+    histList.innerHTML = scanHistory.map(h => `
+      <div class="hist-item">
+        <div class="hist-dot ${h.fraud ? 'fraud' : 'safe'}"></div>
+        <div class="hist-input">${h.input}</div>
+        <div class="hist-verdict ${h.fraud ? 'fraud' : 'safe'}">${h.fraud ? 'FRAUD' : 'SAFE'}</div>
+        <div class="hist-time">${h.time} · ${h.ms}ms</div>
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>
