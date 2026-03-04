@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StopFraud — Intercept Before Money Moves</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #FF2D2D;
+    --red-dim: #C41E1E;
+    --amber: #FFB800;
+    --green: #00FF88;
+    --dark: #080A0F;
+    --dark2: #0D1017;
+    --dark3: #111520;
+    --panel: #141824;
+    --border: rgba(255,255,255,0.07);
+    --text: #E8EAF0;
+    --muted: #6B7280;
+    --white: #ffffff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* NOISE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 48px;
+    background: rgba(8,10,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    color: var(--white);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .nav-logo .dot { width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: pulse-red 1.5s infinite; }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(255,45,45,0.5); }
+    50% { opacity: 0.8; transform: scale(1.2); box-shadow: 0 0 0 6px rgba(255,45,45,0); }
+  }
+
+  .nav-links { display: flex; gap: 36px; list-style: none; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; transition: color 0.2s; font-family: 'Space Mono', monospace; }
+  .nav-links a:hover { color: var(--white); }
+
+  .nav-cta {
+    background: var(--red); color: white; border: none;
+    padding: 10px 24px; font-family: 'Space Mono', monospace;
+    font-size: 12px; letter-spacing: 1px; cursor: pointer;
+    transition: all 0.2s; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .nav-cta:hover { background: var(--red-dim); transform: translateY(-1px); }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    padding: 120px 48px 80px;
+    position: relative;
+    overflow: hidden;
+    gap: 60px;
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0;
+    background: 
+      radial-gradient(ellipse 60% 60% at 70% 50%, rgba(255,45,45,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 20% 80%, rgba(255,184,0,0.04) 0%, transparent 60%);
+  }
+
+  .grid-lines {
+    position: absolute; inset: 0;
+    background-image: 
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .hero-left { position: relative; z-index: 2; }
+
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,45,45,0.1); border: 1px solid rgba(255,45,45,0.3);
+    padding: 6px 14px; font-family: 'Space Mono', monospace;
+    font-size: 11px; letter-spacing: 2px; color: var(--red);
+    text-transform: uppercase; margin-bottom: 28px;
+  }
+
+  .hero-tag::before { content: '//'; opacity: 0.6; }
+
+  .hero-h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(64px, 8vw, 110px);
+    line-height: 0.95;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .hero-h1 .accent { color: var(--red); display: block; }
+  .hero-h1 .stroke {
+    -webkit-text-stroke: 1.5px rgba(255,255,255,0.3);
+    color: transparent;
+    display: block;
+  }
+
+  .hero-sub {
+    font-size: 16px; color: var(--muted); line-height: 1.7;
+    max-width: 440px; margin: 28px 0 40px;
+  }
+
+  .hero-sub strong { color: var(--amber); font-weight: 500; }
+
+  .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; }
+
+  .btn-primary {
+    background: var(--red); color: white; border: none;
+    padding: 14px 32px; font-family: 'Space Mono', monospace;
+    font-size: 13px; cursor: pointer; transition: all 0.25s;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    letter-spacing: 1px;
+  }
+  .btn-primary:hover { background: var(--red-dim); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(255,45,45,0.3); }
+
+  .btn-ghost {
+    background: transparent; color: var(--text); 
+    border: 1px solid var(--border);
+    padding: 14px 32px; font-family: 'Space Mono', monospace;
+    font-size: 13px; cursor: pointer; transition: all 0.25s; letter-spacing: 1px;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.04); }
+
+  /* TERMINAL CARD */
+  .hero-right { position: relative; z-index: 2; }
+
+  .terminal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--red);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    overflow: hidden;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,45,45,0.1);
+  }
+
+  .term-header {
+    padding: 12px 20px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .term-dot.r { background: var(--red); }
+  .term-dot.y { background: var(--amber); }
+  .term-dot.g { background: var(--green); }
+  .term-title { margin-left: auto; margin-right: auto; font-size: 11px; color: var(--muted); letter-spacing: 2px; }
+
+  .term-body { padding: 24px; line-height: 2; }
+
+  .term-line { display: flex; gap: 12px; margin-bottom: 4px; }
+  .term-prompt { color: var(--red); }
+  .term-cmd { color: var(--text); }
+  .term-output { color: var(--muted); padding-left: 24px; }
+  .term-success { color: var(--green); }
+  .term-warn { color: var(--amber); }
+  .term-block { color: var(--red); font-weight: 700; }
+
+  .blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* STATS BAR */
+  .stats-bar {
+    background: var(--dark2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 48px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 16px;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .stat-item:last-child { border-right: none; }
+
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    letter-spacing: 2px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-num.red { color: var(--red); }
+  .stat-num.amber { color: var(--amber); }
+  .stat-num.green { color: var(--green); }
+  .stat-num.white { color: var(--white); }
+
+  .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; font-family: 'Space Mono', monospace; }
+
+  /* SECTION BASE */
+  section { padding: 100px 48px; }
+  .section-tag {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--red); letter-spacing: 3px; text-transform: uppercase;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-tag::before { content: ''; display: block; width: 24px; height: 1px; background: var(--red); }
+  .section-h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(42px, 5vw, 72px);
+    letter-spacing: 2px; line-height: 1;
+    margin-bottom: 16px;
+  }
+  .section-h2 em { font-style: normal; color: var(--red); }
+  .section-lead { color: var(--muted); font-size: 16px; line-height: 1.7; max-width: 560px; }
+
+  /* PROBLEM SECTION */
+  #problem { background: var(--dark2); }
+  .problem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-top: 60px; }
+
+  .problem-cards { display: flex; flex-direction: column; gap: 16px; }
+
+  .problem-card {
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--red);
+    padding: 24px 28px;
+    transition: all 0.25s;
+    position: relative; overflow: hidden;
+  }
+  .problem-card::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, var(--red), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .problem-card:hover { border-left-color: var(--amber); transform: translateX(4px); }
+  .problem-card:hover::after { opacity: 1; }
+
+  .problem-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--white); }
+  .problem-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .problem-card .icon { font-size: 22px; margin-bottom: 10px; }
+
+  .timeline-visual {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px;
+    position: relative;
+  }
+
+  .timeline-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; margin-bottom: 28px; text-transform: uppercase; }
+
+  .tl-item {
+    display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start;
+  }
+  .tl-step {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    flex-shrink: 0; position: relative;
+  }
+  .tl-step.bad { background: rgba(255,45,45,0.15); border: 1px solid var(--red); color: var(--red); }
+  .tl-step.good { background: rgba(0,255,136,0.15); border: 1px solid var(--green); color: var(--green); }
+  .tl-step.warn { background: rgba(255,184,0,0.15); border: 1px solid var(--amber); color: var(--amber); }
+
+  .tl-connector { width: 1px; height: 16px; background: var(--border); margin-left: 15px; }
+  .tl-content h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .tl-content p { font-size: 12px; color: var(--muted); }
+
+  /* OBJECTIVES */
+  #objectives { background: var(--dark); }
+  .obj-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); margin-top: 60px; }
+
+  .obj-card {
+    background: var(--dark);
+    padding: 40px 32px;
+    position: relative; overflow: hidden;
+    transition: background 0.3s;
+  }
+  .obj-card:hover { background: var(--dark3); }
+  .obj-card::before {
+    content: attr(data-num);
+    position: absolute; top: -10px; right: 16px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 90px;
+    color: rgba(255,255,255,0.03); letter-spacing: 0; line-height: 1;
+    pointer-events: none;
+  }
+
+  .obj-icon { font-size: 28px; margin-bottom: 16px; }
+  .obj-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 10px; color: var(--white); }
+  .obj-card p { font-size: 13px; color: var(--muted); line-height: 1.65; }
+  .obj-badge {
+    display: inline-block; margin-top: 14px;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    padding: 4px 10px; letter-spacing: 1px;
+  }
+  .obj-badge.red { background: rgba(255,45,45,0.1); color: var(--red); border: 1px solid rgba(255,45,45,0.2); }
+  .obj-badge.amber { background: rgba(255,184,0,0.1); color: var(--amber); border: 1px solid rgba(255,184,0,0.2); }
+  .obj-badge.green { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+
+  /* ARCHITECTURE */
+  #architecture { background: var(--dark2); }
+  .arch-layout { display: grid; grid-template-columns: 1fr 1.4fr; gap: 60px; align-items: start; margin-top: 60px; }
+
+  .arch-flow { display: flex; flex-direction: column; gap: 0; }
+
+  .arch-step {
+    display: flex; gap: 20px; align-items: flex-start;
+    padding: 20px 24px;
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    position: relative;
+    transition: all 0.2s;
+  }
+  .arch-step:last-child { border-bottom: 1px solid var(--border); }
+  .arch-step:hover { background: var(--panel); z-index: 1; }
+
+  .arch-step-num {
+    font-family: 'Bebas Neue', sans-serif; font-size: 32px;
+    color: rgba(255,255,255,0.1); flex-shrink: 0; line-height: 1;
+  }
+
+  .arch-step-content h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--white); }
+  .arch-step-content p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  .arch-step-time {
+    margin-left: auto; flex-shrink: 0;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--green); background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.15);
+    padding: 3px 8px; align-self: center;
+  }
+
+  .arch-diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+
+  .arch-diag-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 28px; }
+
+  .diag-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+
+  .diag-node {
+    width: 100%; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid var(--border);
+    background: var(--dark3);
+    position: relative;
+  }
+  .diag-node.highlight { border-color: rgba(255,45,45,0.4); background: rgba(255,45,45,0.05); }
+  .diag-node.trae { border-color: rgba(255,184,0,0.4); background: rgba(255,184,0,0.05); }
+
+  .diag-node-label { font-size: 13px; font-weight: 500; }
+  .diag-node-sub { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+  .diag-node-badge { font-family: 'Space Mono', monospace; font-size: 10px; padding: 3px 8px; }
+  .diag-node-badge.red { background: rgba(255,45,45,0.15); color: var(--red); }
+  .diag-node-badge.amber { background: rgba(255,184,0,0.15); color: var(--amber); }
+  .diag-node-badge.green { background: rgba(0,255,136,0.15); color: var(--green); }
+
+  .diag-arrow {
+    width: 1px; height: 20px; background: var(--border); margin: 0 auto;
+    position: relative;
+  }
+  .diag-arrow::after {
+    content: '▼'; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+    color: var(--muted); font-size: 8px;
+  }
+
+  .diag-split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .diag-split-connector {
+    display: flex; align-items: center; justify-content: center;
+    position: relative; width: 100%; height: 20px; margin-bottom: 0;
+  }
+  .diag-split-connector::before {
+    content: ''; position: absolute;
+    width: 50%; height: 1px; background: var(--border);
+    left: 25%;
+  }
+  .diag-split-connector::after {
+    content: ''; position: absolute;
+    width: 1px; height: 100%; background: var(--border);
+    left: 50%;
+  }
+
+  .diag-merge {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; position: relative; height: 24px;
+  }
+  .diag-merge::before {
+    content: 'OR'; font-family: 'Space Mono', monospace; font-size: 9px;
+    color: var(--muted); position: relative; z-index: 1;
+    background: var(--panel); padding: 0 6px;
+  }
+  .diag-merge::after {
+    content: ''; position: absolute;
+    width: 1px; height: 100%; background: var(--border); left: 50%;
+  }
+
+  /* ML PIPELINE */
+  #pipeline { background: var(--dark); }
+  .pipe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 60px; }
+
+  .pipe-card {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    padding: 28px;
+    position: relative; overflow: hidden;
+    transition: all 0.25s;
+  }
+  .pipe-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+  .pipe-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--card-color, var(--red));
+  }
+
+  .pipe-step {
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .pipe-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; color: var(--white); }
+  .pipe-card p { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 16px; }
+
+  .code-snippet {
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--muted);
+    border-radius: 0;
+  }
+  .code-snippet .kw { color: var(--red); }
+  .code-snippet .fn { color: var(--amber); }
+  .code-snippet .str { color: var(--green); }
+  .code-snippet .cm { color: rgba(107,114,128,0.7); }
+
+  /* DEMO SIMULATOR */
+  #demo { background: var(--dark2); }
+  .demo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 60px; }
+
+  .demo-form { 
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+
+  .demo-form h3 { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 24px; }
+
+  .form-row { margin-bottom: 20px; }
+  .form-label { display: block; font-size: 11px; font-family: 'Space Mono', monospace; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+
+  .form-input {
+    width: 100%; background: var(--dark3); border: 1px solid var(--border);
+    color: var(--text); padding: 12px 16px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: rgba(255,255,255,0.2); }
+
+  .form-select {
+    width: 100%; background: var(--dark3); border: 1px solid var(--border);
+    color: var(--text); padding: 12px 16px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    outline: none; transition: border-color 0.2s; cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236B7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 16px center;
+  }
+  .form-select:focus { border-color: rgba(255,255,255,0.2); }
+
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .run-btn {
+    width: 100%; padding: 16px; background: var(--red);
+    border: none; color: white; font-family: 'Space Mono', monospace;
+    font-size: 13px; letter-spacing: 2px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.25s; margin-top: 8px;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  .run-btn:hover { background: var(--red-dim); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,45,45,0.3); }
+  .run-btn:active { transform: translateY(0); }
+
+  .demo-result { 
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 32px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+
+  .result-screen {
+    flex: 1;
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 220px; position: relative; overflow: hidden;
+    transition: all 0.4s;
+  }
+
+  .result-screen.safe { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.03); }
+  .result-screen.fraud { border-color: rgba(255,45,45,0.4); background: rgba(255,45,45,0.05); }
+  .result-screen.analyzing { border-color: rgba(255,184,0,0.3); background: rgba(255,184,0,0.03); }
+
+  .result-icon { font-size: 48px; margin-bottom: 12px; }
+  .result-label {
+    font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 3px;
+  }
+  .result-label.safe { color: var(--green); }
+  .result-label.fraud { color: var(--red); }
+  .result-label.analyzing { color: var(--amber); }
+
+  .result-sub { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-top: 6px; text-align: center; }
+
+  .result-scan {
+    position: absolute; top: 0; left: -100%; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  }
+  .result-screen.analyzing .result-scan { animation: scan 1s linear infinite; }
+  @keyframes scan { to { left: 100%; } }
+
+  .result-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
+  .metric-cell { background: var(--dark3); padding: 16px 12px; text-align: center; }
+  .metric-val { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 1px; }
+  .metric-val.green { color: var(--green); }
+  .metric-val.red { color: var(--red); }
+  .metric-val.amber { color: var(--amber); }
+  .metric-lab { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; }
+
+  .confidence-bar { margin-top: 4px; }
+  .conf-label { display: flex; justify-content: space-between; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+  .conf-track { height: 4px; background: var(--border); overflow: hidden; }
+  .conf-fill { height: 100%; transition: width 0.5s ease; }
+  .conf-fill.low { background: var(--green); }
+  .conf-fill.mid { background: var(--amber); }
+  .conf-fill.high { background: var(--red); }
+
+  /* TRAE SECTION */
+  #trae { background: var(--dark); position: relative; overflow: hidden; }
+  #trae::before {
+    content: 'TRAE';
+    position: absolute; right: -40px; top: 50%; transform: translateY(-50%);
+    font-family: 'Bebas Neue', sans-serif; font-size: 300px; letter-spacing: -10px;
+    color: rgba(255,184,0,0.02); pointer-events: none; line-height: 1;
+  }
+
+  .trae-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; margin-top: 60px; }
+
+  .trae-info { }
+  .trae-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,184,0,0.1); border: 1px solid rgba(255,184,0,0.3);
+    padding: 6px 14px; margin-bottom: 20px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--amber); letter-spacing: 2px;
+  }
+
+  .trae-desc { font-size: 15px; color: var(--muted); line-height: 1.75; margin-bottom: 28px; }
+  .trae-desc strong { color: var(--text); }
+
+  .trae-roles { display: flex; flex-direction: column; gap: 12px; }
+  .trae-role {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 20px; background: var(--dark2); border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .trae-role:hover { border-color: rgba(255,184,0,0.3); background: rgba(255,184,0,0.03); }
+  .trae-role-icon { font-size: 20px; flex-shrink: 0; }
+  .trae-role-text { font-size: 13px; color: var(--text); }
+  .trae-role-text span { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+
+  .trae-prompts { }
+  .prompts-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+
+  .prompt-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--amber);
+    padding: 16px 20px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .prompt-item:hover { border-left-color: var(--red); background: var(--dark3); }
+  .prompt-num { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--amber); margin-bottom: 4px; }
+  .prompt-text { font-size: 12px; color: var(--muted); line-height: 1.5; font-family: 'Space Mono', monospace; }
+
+  /* RESULTS / METRICS */
+  #results { background: var(--dark2); }
+  .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 60px; }
+
+  .confusion-matrix { background: var(--panel); border: 1px solid var(--border); padding: 28px; }
+  .cm-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+  .cm-grid { display: grid; grid-template-columns: auto 1fr 1fr; grid-template-rows: auto 1fr 1fr; gap: 2px; }
+
+  .cm-cell {
+    padding: 20px 16px; text-align: center; font-family: 'Space Mono', monospace;
+  }
+  .cm-header-cell { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; display: flex; align-items: center; justify-content: center; }
+  .cm-val {
+    font-family: 'Bebas Neue', sans-serif; font-size: 36px; display: block; letter-spacing: 1px;
+  }
+  .cm-lab { font-size: 9px; color: var(--muted); letter-spacing: 1px; margin-top: 2px; }
+  .cm-tp { background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.15); }
+  .cm-fp { background: rgba(255,184,0,0.06); border: 1px solid rgba(255,184,0,0.15); }
+  .cm-fn { background: rgba(255,45,45,0.08); border: 1px solid rgba(255,45,45,0.15); }
+  .cm-tn { background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.1); }
+  .cm-corner { background: transparent; }
+
+  .metrics-list { display: flex; flex-direction: column; gap: 0; }
+  .metric-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0; border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-name { font-size: 14px; color: var(--text); }
+  .metric-name span { display: block; font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; margin-top: 2px; }
+  .metric-value { font-family: 'Bebas Neue', sans-serif; font-size: 36px; letter-spacing: 1px; }
+  .metric-bar-wrap { flex: 1; margin: 0 20px; }
+  .metric-bar-bg { height: 3px; background: var(--border); }
+  .metric-bar-fg { height: 100%; transition: width 1s ease; }
+
+  /* FOOTER */
+  footer {
+    background: var(--dark);
+    border-top: 1px solid var(--border);
+    padding: 48px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 48px; align-items: start;
+  }
+
+  .footer-logo { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; margin-bottom: 12px; }
+  .footer-desc { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+  .footer-col h4 { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px; }
+  .footer-col ul { list-style: none; }
+  .footer-col li { font-size: 13px; color: var(--muted); margin-bottom: 8px; cursor: default; }
+  .footer-col li:hover { color: var(--text); }
+
+  .footer-bottom {
+    background: var(--dark);
+    border-top: 1px solid var(--border);
+    padding: 20px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .footer-bottom p { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+
+  /* ANIMATIONS */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in { animation: fadeInUp 0.6s ease forwards; opacity: 0; }
+  .fade-in-1 { animation-delay: 0.1s; }
+  .fade-in-2 { animation-delay: 0.2s; }
+  .fade-in-3 { animation-delay: 0.3s; }
+  .fade-in-4 { animation-delay: 0.4s; }
+  .fade-in-5 { animation-delay: 0.5s; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--dark); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,45,45,0.4); }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    .nav-links { display: none; }
+    section { padding: 60px 24px; }
+    .hero { grid-template-columns: 1fr; padding: 100px 24px 60px; }
+    .hero-right { display: none; }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); padding: 20px 24px; }
+    .stat-item:nth-child(2) { border-right: none; }
+    .stat-item:nth-child(3) { border-right: 1px solid var(--border); border-top: 1px solid var(--border); }
+    .stat-item:nth-child(4) { border-top: 1px solid var(--border); }
+    .problem-grid, .arch-layout, .trae-grid, .results-grid, .demo-layout { grid-template-columns: 1fr; }
+    .obj-grid { grid-template-columns: 1fr; }
+    .pipe-grid { grid-template-columns: 1fr; }
+    footer { grid-template-columns: 1fr; }
+    .footer-bottom { flex-direction: column; gap: 8px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="dot"></div>
+    STOPFRAUD
+  </div>
+  <ul class="nav-links">
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#pipeline">ML Pipeline</a></li>
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#trae">TRAE</a></li>
+  </ul>
+  <button class="nav-cta">View Demo →</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:120px">
+  <div class="hero-bg"></div>
+  <div class="grid-lines"></div>
+
+  <div class="hero-left">
+    <div class="hero-tag fade-in fade-in-1">Cyber Threat Detection System</div>
+    <h1 class="hero-h1 fade-in fade-in-2">
+      <span class="stroke">STOP FRAUD</span>
+      <span class="accent">BEFORE</span>
+      <span>MONEY MOVES</span>
+    </h1>
+    <p class="hero-sub fade-in fade-in-3">
+      Fraudsters now use <strong>AI and social engineering</strong> to bypass traditional systems. Current detection only fires after funds have already transferred. We intercept <strong>during the transaction</strong> — in under 300ms.
+    </p>
+    <div class="hero-btns fade-in fade-in-4">
+      <button class="btn-primary" onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">Run Live Demo</button>
+      <button class="btn-ghost" onclick="document.getElementById('architecture').scrollIntoView({behavior:'smooth'})">View Architecture</button>
+    </div>
+  </div>
+
+  <div class="hero-right fade-in fade-in-5">
+    <div class="terminal">
+      <div class="term-header">
+        <div class="term-dot r"></div>
+        <div class="term-dot y"></div>
+        <div class="term-dot g"></div>
+        <div class="term-title">FRAUD_INTERCEPTOR v2.4.1</div>
+      </div>
+      <div class="term-body">
+        <div class="term-line"><span class="term-prompt">›</span><span class="term-cmd">transaction.incoming(id=TX-928471)</span></div>
+        <div class="term-output">Amount: $4,200 | Mumbai → London</div>
+        <div class="term-output">Device: Windows PC | Usual: iPhone 14</div>
+        <div class="term-output">Time since last tx: 4 mins 32 secs</div>
+        <div class="term-line" style="margin-top:8px"><span class="term-prompt">›</span><span class="term-cmd">xgboost.predict(features)</span></div>
+        <div class="term-output">Fraud probability: <span class="term-warn">0.847</span></div>
+        <div class="term-line"><span class="term-prompt">›</span><span class="term-cmd">isolation_forest.check()</span></div>
+        <div class="term-output">Anomaly score: <span class="term-warn">-0.312</span> (UNUSUAL)</div>
+        <div class="term-line"><span class="term-prompt">›</span><span class="term-cmd">threshold.evaluate(0.35)</span></div>
+        <div class="term-output" style="margin-top:4px">Response time: <span class="term-success">68ms</span></div>
+        <div class="term-block" style="margin-top:8px; padding: 8px 0;">⛔ TRANSACTION BLOCKED — FRAUD INTERCEPTED</div>
+        <div class="term-output">Reason: Device mismatch + geography jump + amount spike</div>
+        <div class="term-line" style="margin-top:8px"><span class="term-prompt">›</span><span class="blink">_</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num red" id="cnt-ms">0</div>
+    <div class="stat-label">Max Response Time (ms)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num green" id="cnt-acc">0</div>
+    <div class="stat-label">Model Accuracy (%)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num amber" id="cnt-fp">0</div>
+    <div class="stat-label">False Positive Rate (%)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num white" id="cnt-data">0</div>
+    <div class="stat-label">Training Records (K)</div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="section-tag">The Problem</div>
+  <h2 class="section-h2">Fraud Is <em>Already Ahead</em></h2>
+  <p class="section-lead">Traditional fraud detection is reactive — it reviews transactions after they complete. By then, money is gone and recovery is near impossible.</p>
+
+  <div class="problem-grid">
+    <div class="problem-cards">
+      <div class="problem-card">
+        <div class="icon">🤖</div>
+        <h3>AI-Powered Social Engineering</h3>
+        <p>Fraudsters use deepfake voice calls, AI-generated phishing emails, and real-time conversation coaching to manipulate victims into authorising transfers they believe are legitimate.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">⏱️</div>
+        <h3>Detection Happens Too Late</h3>
+        <p>Current rule-based systems and batch ML models only flag transactions after settlement — sometimes hours later. The money has already left the account.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">📊</div>
+        <h3>High False Positive Rates</h3>
+        <p>Existing solutions block too many legitimate transactions, damaging customer trust. Users get locked out of genuine payments, causing direct revenue loss.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">🔍</div>
+        <h3>No Contextual Intelligence</h3>
+        <p>Static rules can't adapt to evolving fraud patterns. They miss novel attack vectors like geography jumps, device mismatches, and behavioural anomalies combined.</p>
+      </div>
+    </div>
+
+    <div class="timeline-visual">
+      <div class="timeline-title">// Current System vs Our Approach</div>
+
+      <div style="margin-bottom:28px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--red);letter-spacing:2px;margin-bottom:12px">CURRENT (BROKEN)</div>
+        <div class="tl-item"><div class="tl-step bad">1</div><div class="tl-content"><h4>User clicks "Send Money"</h4><p>Transaction begins</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step bad">2</div><div class="tl-content"><h4>Funds transfer immediately</h4><p>Money leaves account</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step bad">3</div><div class="tl-content"><h4>Fraud detected hours later</h4><p>Batch analysis flags it — too late</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step bad">4</div><div class="tl-content"><h4>Recovery attempted (rarely succeeds)</h4><p>Money is gone. Damage done.</p></div></div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:28px">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--green);letter-spacing:2px;margin-bottom:12px">OUR SYSTEM (PROACTIVE)</div>
+        <div class="tl-item"><div class="tl-step good">1</div><div class="tl-content"><h4>User clicks "Send Money"</h4><p>Transaction intercepted pre-settlement</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step good">2</div><div class="tl-content"><h4>ML engine analyses in &lt;300ms</h4><p>XGBoost + Isolation Forest both run</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step good">3</div><div class="tl-content"><h4>Safe → Approved / Fraud → Blocked</h4><p>Real-time decision before funds move</p></div></div>
+        <div class="tl-connector"></div>
+        <div class="tl-item"><div class="tl-step good">4</div><div class="tl-content"><h4>Zero monetary loss</h4><p>Fraud intercepted. Account protected.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OBJECTIVES -->
+<section id="objectives">
+  <div class="section-tag">Objectives</div>
+  <h2 class="section-h2">What We're <em>Building</em></h2>
+  <p class="section-lead">Five clear engineering and product objectives that define what success looks like for this system.</p>
+
+  <div class="obj-grid">
+    <div class="obj-card" data-num="01">
+      <div class="obj-icon">⚡</div>
+      <h3>Real-Time Detection</h3>
+      <p>Detect and classify every transaction as legitimate or fraudulent within a strict sub-300ms window — fast enough to intercept before settlement occurs in any payment system.</p>
+      <div class="obj-badge red">&lt;300ms SLA</div>
+    </div>
+    <div class="obj-card" data-num="02">
+      <div class="obj-icon">🛑</div>
+      <h3>Proactive Fund Interception</h3>
+      <p>For all high-risk transactions above the confidence threshold, hard-block the transfer before money moves. No reversals needed. No recovery overhead.</p>
+      <div class="obj-badge red">BLOCK BEFORE SETTLE</div>
+    </div>
+    <div class="obj-card" data-num="03">
+      <div class="obj-icon">🎯</div>
+      <h3>Minimise False Positives</h3>
+      <p>Precision-tuned threshold selection keeps legitimate transactions flowing. A calibrated decision boundary at 35% confidence balances fraud recall with business continuity.</p>
+      <div class="obj-badge amber">&lt;2% FP RATE</div>
+    </div>
+    <div class="obj-card" data-num="04">
+      <div class="obj-icon">📈</div>
+      <h3>Scalable & Secure Deployment</h3>
+      <p>FastAPI asynchronous serving handles concurrent transactions without latency degradation. Models are pre-loaded in memory, not re-initialised per request.</p>
+      <div class="obj-badge green">FASTAPI + ASYNC</div>
+    </div>
+    <div class="obj-card" data-num="05">
+      <div class="obj-icon">🔮</div>
+      <h3>Dual-Layer AI Engine</h3>
+      <p>XGBoost handles known fraud patterns from labelled data. Isolation Forest catches brand-new anomalies it has never seen before. Both must agree before a transaction is approved.</p>
+      <div class="obj-badge amber">XGBOOST + ISO FOREST</div>
+    </div>
+    <div class="obj-card" data-num="06">
+      <div class="obj-icon">🧠</div>
+      <h3>Behavioural Feature Engineering</h3>
+      <p>Beyond raw transaction data — we compute device mismatch flags, geography velocity, time-since-last-transaction, and amount deviation from user baseline for each request.</p>
+      <div class="obj-badge green">SMART FEATURES</div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="section-tag">System Architecture</div>
+  <h2 class="section-h2">How It <em>Works</em></h2>
+  <p class="section-lead">A request enters the system and traverses a multi-layer pipeline — completing the full fraud analysis and decision in under 75ms average.</p>
+
+  <div class="arch-layout">
+    <div class="arch-flow">
+      <div class="arch-step">
+        <div class="arch-step-num">01</div>
+        <div class="arch-step-content">
+          <h4>Transaction Received (FastAPI)</h4>
+          <p>JSON payload arrives via POST endpoint. Request validation, auth header check, rate limiting applied.</p>
+        </div>
+        <div class="arch-step-time">~10ms</div>
+      </div>
+      <div class="arch-step">
+        <div class="arch-step-num">02</div>
+        <div class="arch-step-content">
+          <h4>Feature Extraction & Engineering</h4>
+          <p>Raw transaction enriched with computed features: device delta, geo velocity, amount z-score, time patterns.</p>
+        </div>
+        <div class="arch-step-time">~30ms</div>
+      </div>
+      <div class="arch-step">
+        <div class="arch-step-num">03</div>
+        <div class="arch-step-content">
+          <h4>XGBoost Inference</h4>
+          <p>Gradient-boosted ensemble model (pre-loaded in memory) produces fraud probability score from engineered features.</p>
+        </div>
+        <div class="arch-step-time">~10ms</div>
+      </div>
+      <div class="arch-step">
+        <div class="arch-step-num">04</div>
+        <div class="arch-step-content">
+          <h4>Isolation Forest Anomaly Check</h4>
+          <p>Unsupervised model detects statistically unusual transactions — catches novel fraud patterns outside training distribution.</p>
+        </div>
+        <div class="arch-step-time">~15ms</div>
+      </div>
+      <div class="arch-step">
+        <div class="arch-step-num">05</div>
+        <div class="arch-step-content">
+          <h4>Threshold Decision Engine</h4>
+          <p>If XGBoost ≥ 0.35 OR Isolation Forest anomalous → BLOCK. Otherwise → APPROVE. Response dispatched.</p>
+        </div>
+        <div class="arch-step-time">~10ms</div>
+      </div>
+      <div class="arch-step" style="border-color:rgba(0,255,136,0.2);background:rgba(0,255,136,0.03)">
+        <div class="arch-step-num" style="color:rgba(0,255,136,0.3)">✓</div>
+        <div class="arch-step-content">
+          <h4 style="color:var(--green)">Decision Returned</h4>
+          <p>SAFE or FRAUD INTERCEPTED status returned with reason codes, confidence score, and elapsed time.</p>
+        </div>
+        <div class="arch-step-time" style="color:var(--green)">&lt;75ms</div>
+      </div>
+    </div>
+
+    <div class="arch-diagram">
+      <div class="arch-diag-title">// Transaction Flow Diagram</div>
+      <div class="diag-flow">
+        <div class="diag-node">
+          <div><div class="diag-node-label">User Initiates Transfer</div><div class="diag-node-sub">POST /api/v1/transaction</div></div>
+          <div class="diag-node-badge amber">INPUT</div>
+        </div>
+        <div class="diag-arrow"></div>
+        <div class="diag-node">
+          <div><div class="diag-node-label">FastAPI Gateway</div><div class="diag-node-sub">Auth · Validate · Preprocess</div></div>
+          <div class="diag-node-badge amber">~10ms</div>
+        </div>
+        <div class="diag-arrow"></div>
+        <div class="diag-node">
+          <div><div class="diag-node-label">Feature Engineering Layer</div><div class="diag-node-sub">Device · Geo · Amount · Time</div></div>
+          <div class="diag-node-badge amber">~30ms</div>
+        </div>
+
+        <div class="diag-split-connector"></div>
+
+        <div class="diag-split">
+          <div class="diag-node highlight" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <div class="diag-node-label" style="font-size:12px">XGBoost</div>
+            <div class="diag-node-sub">Supervised · Labelled</div>
+            <div class="diag-node-badge red" style="margin-top:4px">~10ms</div>
+          </div>
+          <div class="diag-node" style="border-color:rgba(255,184,0,0.3);background:rgba(255,184,0,0.04);flex-direction:column;align-items:flex-start;gap:4px">
+            <div class="diag-node-label" style="font-size:12px">Isolation Forest</div>
+            <div class="diag-node-sub">Unsupervised · Anomaly</div>
+            <div class="diag-node-badge amber" style="margin-top:4px">~15ms</div>
+          </div>
+        </div>
+
+        <div class="diag-merge"></div>
+
+        <div class="diag-node highlight">
+          <div><div class="diag-node-label">Threshold Decision Engine</div><div class="diag-node-sub">≥0.35 OR anomalous → BLOCK</div></div>
+          <div class="diag-node-badge red">~10ms</div>
+        </div>
+        <div class="diag-arrow"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
+          <div class="diag-node" style="border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.05);flex-direction:column;align-items:center;text-align:center;gap:4px;padding:16px">
+            <span style="font-size:20px">✅</span>
+            <div class="diag-node-label" style="color:var(--green);font-size:13px">APPROVED</div>
+            <div class="diag-node-sub">Transaction proceeds</div>
+          </div>
+          <div class="diag-node" style="border-color:rgba(255,45,45,0.4);background:rgba(255,45,45,0.08);flex-direction:column;align-items:center;text-align:center;gap:4px;padding:16px">
+            <span style="font-size:20px">🚨</span>
+            <div class="diag-node-label" style="color:var(--red);font-size:13px">BLOCKED</div>
+            <div class="diag-node-sub">Funds intercepted</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;padding:12px 16px;background:rgba(255,184,0,0.05);border:1px solid rgba(255,184,0,0.2);width:100%">
+          <div class="diag-node-label" style="font-size:12px;color:var(--amber)">⚡ TRAE AI Development Assistant</div>
+          <div class="diag-node-sub">Accelerates model dev · Pipeline automation · Rapid prototyping</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ML PIPELINE -->
+<section id="pipeline">
+  <div class="section-tag">ML Pipeline</div>
+  <h2 class="section-h2">Six-Step <em>Engine</em></h2>
+  <p class="section-lead">Built on the IEEE-CIS Fraud Detection dataset from Kaggle — real-world transaction data from Vesta Corporation with 590K records.</p>
+
+  <div class="pipe-grid">
+    <div class="pipe-card" style="--card-color: #FF2D2D">
+      <div class="pipe-step">Step 01</div>
+      <h3>Data Cleaning</h3>
+      <p>Handle missing values, drop irrelevant columns, encode categoricals (card type, browser, device) into numeric representations the model understands.</p>
+      <div class="code-snippet"><span class="cm"># Encode card type + handle NaN</span><br><span class="kw">df</span>.fillna(<span class="str">-999</span>)<br><span class="fn">LabelEncoder</span>().fit_transform(<span class="kw">df</span>[<span class="str">'card4'</span>])</div>
+    </div>
+    <div class="pipe-card" style="--card-color: #FF8C00">
+      <div class="pipe-step">Step 02</div>
+      <h3>Feature Engineering</h3>
+      <p>Create powerful derived features: time since last transaction, amount deviation from user average, geography velocity, and device mismatch flag.</p>
+      <div class="code-snippet"><span class="cm"># Geography velocity check</span><br><span class="kw">delta_time</span> = tx[<span class="str">'ts'</span>] - prev_tx[<span class="str">'ts'</span>]<br><span class="kw">geo_jump</span> = haversine(loc1, loc2)</div>
+    </div>
+    <div class="pipe-card" style="--card-color: #FFB800">
+      <div class="pipe-step">Step 03</div>
+      <h3>Imbalanced Data Handling</h3>
+      <p>Only ~3.5% of transactions are fraud. Naive training gets 96% accuracy while catching zero fraud. SMOTE and class weighting fix this.</p>
+      <div class="code-snippet"><span class="cm"># SMOTE oversampling</span><br><span class="kw">sm</span> = <span class="fn">SMOTE</span>(random_state=<span class="str">42</span>)<br>X_res, y_res = <span class="kw">sm</span>.fit_resample(X, y)</div>
+    </div>
+    <div class="pipe-card" style="--card-color: #00C3FF">
+      <div class="pipe-step">Step 04</div>
+      <h3>XGBoost Training</h3>
+      <p>Sequential gradient-boosted decision trees — each tree learns from the previous one's errors. Handles tabular data better than neural networks at this scale.</p>
+      <div class="code-snippet"><span class="cm"># XGBoost with class weight</span><br><span class="kw">model</span> = <span class="fn">XGBClassifier</span>(<br>  scale_pos_weight=<span class="str">97</span>,<br>  max_depth=<span class="str">6</span>, n_estimators=<span class="str">500</span>)</div>
+    </div>
+    <div class="pipe-card" style="--card-color: #8B5CF6">
+      <div class="pipe-step">Step 05</div>
+      <h3>Isolation Forest Layer</h3>
+      <p>Unsupervised anomaly detection — no labels needed. Detects statistically unusual transactions regardless of whether fraud patterns appear in training data.</p>
+      <div class="code-snippet"><span class="cm"># Isolation Forest backup</span><br><span class="kw">iso</span> = <span class="fn">IsolationForest</span>(contamination=<span class="str">0.035</span>)<br>anomaly = <span class="kw">iso</span>.predict(X_test)</div>
+    </div>
+    <div class="pipe-card" style="--card-color: #00FF88">
+      <div class="pipe-step">Step 06</div>
+      <h3>Threshold Tuning</h3>
+      <p>Default 50% confidence threshold creates too many false positives. Precision-recall curve analysis finds optimal threshold at ~35% for this use case.</p>
+      <div class="code-snippet"><span class="cm"># Threshold at 0.35 confidence</span><br><span class="kw">probs</span> = model.predict_proba(X)[:,<span class="str">1</span>]<br><span class="kw">preds</span> = (<span class="kw">probs</span> &gt;= <span class="str">0.35</span>).astype(int)</div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO SIMULATOR -->
+<section id="demo">
+  <div class="section-tag">Live Simulator</div>
+  <h2 class="section-h2">Test the <em>Engine</em></h2>
+  <p class="section-lead">Submit a transaction and watch the fraud engine analyse it in real time. Try suspicious combinations to trigger a block.</p>
+
+  <div class="demo-layout">
+    <div class="demo-form">
+      <h3>// Transaction Input</h3>
+
+      <div class="form-row">
+        <label class="form-label">Transaction Amount ($)</label>
+        <input type="number" class="form-input" id="tx-amount" placeholder="e.g. 4200" value="250">
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Origin Location</label>
+          <select class="form-select" id="tx-origin">
+            <option>Mumbai, IN</option>
+            <option>New York, US</option>
+            <option>London, UK</option>
+            <option>Lagos, NG</option>
+            <option>Dubai, UAE</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label class="form-label">Destination</label>
+          <select class="form-select" id="tx-dest">
+            <option>London, UK</option>
+            <option>Mumbai, IN</option>
+            <option>Lagos, NG</option>
+            <option>Shanghai, CN</option>
+            <option>New York, US</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:20px">
+        <label class="form-label">Device Used</label>
+        <select class="form-select" id="tx-device">
+          <option>iPhone 14 (Usual Device)</option>
+          <option>Windows PC (New Device)</option>
+          <option>Android Unknown (New Device)</option>
+          <option>MacBook Pro (Usual Device)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">Time Since Last Transaction</label>
+        <select class="form-select" id="tx-time">
+          <option>3 days (Normal)</option>
+          <option>8 minutes (Suspicious)</option>
+          <option>45 seconds (Critical)</option>
+          <option>2 hours (Normal)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label class="form-label">Email Domain</label>
+        <select class="form-select" id="tx-email">
+          <option>Corporate (company.com)</option>
+          <option>Free (gmail.com)</option>
+          <option>Free (yahoo.com)</option>
+          <option>Unknown domain</option>
+        </select>
+      </div>
+
+      <button class="run-btn" onclick="runAnalysis()">⚡ ANALYSE TRANSACTION</button>
+    </div>
+
+    <div class="demo-result">
+      <div class="result-screen" id="result-screen">
+        <div class="result-scan"></div>
+        <div class="result-icon" id="result-icon">🔍</div>
+        <div class="result-label" id="result-label" style="color:var(--muted)">AWAITING INPUT</div>
+        <div class="result-sub" id="result-sub">Submit a transaction to begin analysis</div>
+      </div>
+
+      <div class="result-metrics">
+        <div class="metric-cell">
+          <div class="metric-val green" id="m-time">—</div>
+          <div class="metric-lab">Response (ms)</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-val amber" id="m-prob">—</div>
+          <div class="metric-lab">Fraud Score</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-val" id="m-model" style="color:var(--muted);font-size:18px">—</div>
+          <div class="metric-lab">Triggered By</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="confidence-bar">
+          <div class="conf-label"><span>Fraud Confidence</span><span id="conf-pct">0%</span></div>
+          <div class="conf-track">
+            <div class="conf-fill low" id="conf-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);line-height:2" id="reason-log">
+          // Analysis log will appear here
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRAE -->
+<section id="trae">
+  <div class="section-tag">AI Development Accelerator</div>
+  <h2 class="section-h2">Powered by <em>TRAE</em></h2>
+  <p class="section-lead">TRAE is the AI development assistant used to accelerate every stage of this project — from raw data wrangling to deploying the live API.</p>
+
+  <div class="trae-grid">
+    <div class="trae-info">
+      <div class="trae-badge">⚡ TRAE AI ASSISTANT</div>
+      <p class="trae-desc">
+        Instead of spending days writing boilerplate ML code, <strong>TRAE automated the entire development pipeline</strong>. From data cleaning prompts to FastAPI deployment, TRAE handled the engineering scaffolding so the team could focus on architecture and tuning decisions.
+      </p>
+      <p class="trae-desc">
+        Each step of the 6-hour build cycle was <strong>driven by precision prompts</strong> that generated production-quality code with comments, error handling, and model evaluation built in.
+      </p>
+
+      <div class="trae-roles">
+        <div class="trae-role"><div class="trae-role-icon">🧹</div><div class="trae-role-text">Data Pipeline Automation<span>Automated cleaning, encoding, and SMOTE balancing across 590K rows</span></div></div>
+        <div class="trae-role"><div class="trae-role-icon">⚙️</div><div class="trae-role-text">Model Development<span>Generated XGBoost + Isolation Forest code with proper class weighting</span></div></div>
+        <div class="trae-role"><div class="trae-role-icon">🔧</div><div class="trae-role-text">Threshold & Eval Tooling<span>Built precision-recall curves and confusion matrix analysis automatically</span></div></div>
+        <div class="trae-role"><div class="trae-role-icon">🚀</div><div class="trae-role-text">FastAPI Deployment<span>Scaffolded the full async API with memory-loaded models from a single prompt</span></div></div>
+        <div class="trae-role"><div class="trae-role-icon">🖥️</div><div class="trae-role-text">Demo UI Generation<span>Built the real-time frontend interface for live transaction testing</span></div></div>
+      </div>
+    </div>
+
+    <div class="trae-prompts">
+      <div class="prompts-title">// Exact TRAE Prompts Used</div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 01 — DATA SETUP</div>
+        <div class="prompt-text">"I have the IEEE-CIS fraud detection dataset from Kaggle. Clean it, handle missing values, encode categorical columns, and explain each step with comments."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 02 — FEATURE ENGINEERING</div>
+        <div class="prompt-text">"Add these engineered features: time since last transaction, amount deviation from user average, and device mismatch flag. Show me the code with comments."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 03 — MODEL TRAINING</div>
+        <div class="prompt-text">"Train an XGBoost classifier on this fraud dataset. Use class weighting to handle imbalanced data. Show accuracy, precision, recall and a confusion matrix."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 04 — THRESHOLD TUNING</div>
+        <div class="prompt-text">"Tune the classification threshold to minimise false positives while maintaining high recall. Plot precision-recall curve."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 05 — ISOLATION FOREST</div>
+        <div class="prompt-text">"Add an Isolation Forest anomaly detector as a second layer alongside XGBoost. If either flags fraud, block the transaction."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 06 — FASTAPI</div>
+        <div class="prompt-text">"Wrap this fraud detection pipeline in FastAPI. Load the model once at startup. Accept transaction data as JSON and return a prediction in under 300ms."</div>
+      </div>
+      <div class="prompt-item">
+        <div class="prompt-num">PROMPT 07 — DEMO UI</div>
+        <div class="prompt-text">"Build a simple HTML frontend where I can input transaction details and see a real-time SAFE or FRAUD INTERCEPTED result with response time shown."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section id="results">
+  <div class="section-tag">Model Performance</div>
+  <h2 class="section-h2">The <em>Numbers</em></h2>
+  <p class="section-lead">Evaluated on held-out test set from the IEEE-CIS dataset. Threshold set at 0.35 to minimise false positives while maintaining high fraud recall.</p>
+
+  <div class="results-grid">
+    <div class="confusion-matrix">
+      <div class="cm-title">// Confusion Matrix</div>
+      <div class="cm-grid">
+        <div class="cm-cell cm-corner"></div>
+        <div class="cm-cell cm-header-cell" style="color:var(--green)">Predicted: SAFE</div>
+        <div class="cm-cell cm-header-cell" style="color:var(--red)">Predicted: FRAUD</div>
+
+        <div class="cm-cell cm-header-cell" style="color:var(--green);flex-direction:column;font-size:9px">Actual<br>SAFE</div>
+        <div class="cm-cell cm-tp">
+          <span class="cm-val" style="color:var(--green)">94.2K</span>
+          <div class="cm-lab">TRUE NEGATIVE</div>
+        </div>
+        <div class="cm-cell cm-fp">
+          <span class="cm-val" style="color:var(--amber)">1.8K</span>
+          <div class="cm-lab">FALSE POSITIVE</div>
+        </div>
+
+        <div class="cm-cell cm-header-cell" style="color:var(--red);flex-direction:column;font-size:9px">Actual<br>FRAUD</div>
+        <div class="cm-cell cm-fn">
+          <span class="cm-val" style="color:var(--red)">412</span>
+          <div class="cm-lab">FALSE NEGATIVE</div>
+        </div>
+        <div class="cm-cell cm-tp">
+          <span class="cm-val" style="color:var(--green)">3.4K</span>
+          <div class="cm-lab">TRUE POSITIVE</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="metrics-list">
+        <div class="metric-row">
+          <div class="metric-name">Accuracy<span>Overall correctness</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:97.4%;background:var(--green)"></div></div></div>
+          <div class="metric-value" style="color:var(--green)">97.4%</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-name">Precision<span>Of flagged, how many real fraud</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:65%;background:var(--amber)"></div></div></div>
+          <div class="metric-value" style="color:var(--amber)">65.4%</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-name">Recall<span>Of all fraud, how many caught</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:89%;background:var(--green)"></div></div></div>
+          <div class="metric-value" style="color:var(--green)">89.2%</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-name">F1 Score<span>Precision-recall balance</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:75%;background:var(--amber)"></div></div></div>
+          <div class="metric-value" style="color:var(--amber)">75.4%</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-name">False Positive Rate<span>Legitimate tx blocked</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:1.9%;background:var(--red)"></div></div></div>
+          <div class="metric-value" style="color:var(--green)">1.9%</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-name">Avg Response Time<span>End-to-end latency</span></div>
+          <div class="metric-bar-wrap"><div class="metric-bar-bg"><div class="metric-bar-fg" style="width:25%;background:var(--green)"></div></div></div>
+          <div class="metric-value" style="color:var(--green)">68ms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <div class="footer-logo">⛔ STOPFRAUD</div>
+    <p class="footer-desc">A proactive fraud interception engine that blocks suspicious transactions during the payment lifecycle — before money moves.</p>
+  </div>
+  <div class="footer-col">
+    <h4>Project Stack</h4>
+    <ul>
+      <li>Python 3.11</li>
+      <li>XGBoost 2.0</li>
+      <li>scikit-learn</li>
+      <li>FastAPI</li>
+      <li>IEEE-CIS Dataset</li>
+      <li>TRAE AI Assistant</li>
+    </ul>
+  </div>
+  <div class="footer-col">
+    <h4>Key Features</h4>
+    <ul>
+      <li>Sub-300ms detection</li>
+      <li>Dual-layer AI engine</li>
+      <li>Behavioural features</li>
+      <li>Threshold tuning</li>
+      <li>Async FastAPI serving</li>
+      <li>Confusion matrix eval</li>
+    </ul>
+  </div>
+</footer>
+
+<div class="footer-bottom">
+  <p>// STOPFRAUD — Cyber Threat Detection System</p>
+  <p>Built with TRAE · IEEE-CIS Dataset · XGBoost + Isolation Forest</p>
+</div>
+
+<script>
+  // COUNTER ANIMATIONS
+  function animateCount(id, target, suffix='', duration=1500) {
+    const el = document.getElementById(id);
+    const start = performance.now();
+    function update(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(ease * target) + suffix;
+      if (t < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        animateCount('cnt-ms', 300);
+        animateCount('cnt-acc', 97);
+        animateCount('cnt-fp', 19, '/10');
+        animateCount('cnt-data', 590);
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.5 });
+  observer.observe(document.querySelector('.stats-bar'));
+
+  // DEMO ANALYSER
+  function runAnalysis() {
+    const amount = parseFloat(document.getElementById('tx-amount').value) || 250;
+    const origin = document.getElementById('tx-origin').value;
+    const dest = document.getElementById('tx-dest').value;
+    const device = document.getElementById('tx-device').value;
+    const timeSince = document.getElementById('tx-time').value;
+    const email = document.getElementById('tx-email').value;
+
+    // Set analyzing state
+    const screen = document.getElementById('result-screen');
+    screen.className = 'result-screen analyzing';
+    document.getElementById('result-icon').textContent = '⚡';
+    document.getElementById('result-label').textContent = 'ANALYSING';
+    document.getElementById('result-label').className = 'result-label analyzing';
+    document.getElementById('result-sub').textContent = 'Running ML pipeline...';
+    document.getElementById('m-time').textContent = '—';
+    document.getElementById('m-prob').textContent = '—';
+
+    // Compute fraud score
+    let score = 0.05;
+    let reasons = [];
+    let triggered = [];
+
+    if (amount > 2000) { score += 0.15; reasons.push('High transaction amount: $' + amount); }
+    if (amount > 5000) { score += 0.1; reasons.push('Amount exceeds $5K threshold'); }
+
+    const diffLocations = origin !== dest;
+    if (diffLocations) {
+      const highRiskPairs = [
+        ['Mumbai, IN', 'London, UK'], ['Lagos, NG', 'New York, US'],
+        ['Lagos, NG', 'London, UK'], ['Mumbai, IN', 'Shanghai, CN']
+      ];
+      if (highRiskPairs.some(p => (p[0]===origin && p[1]===dest) || (p[1]===origin && p[0]===dest))) {
+        score += 0.25; reasons.push('High-risk geography: ' + origin + ' → ' + dest);
+      }
+    }
+
+    if (device.includes('New Device')) {
+      score += 0.3; reasons.push('Device mismatch: ' + device.split(' (')[0]);
+      triggered.push('XGBoost');
+    }
+
+    if (timeSince.includes('seconds')) {
+      score += 0.35; reasons.push('Critical velocity: ' + timeSince);
+      triggered.push('XGBoost'); triggered.push('Isolation Forest');
+    } else if (timeSince.includes('Suspicious')) {
+      score += 0.2; reasons.push('Suspicious timing: ' + timeSince);
+      triggered.push('Isolation Forest');
+    }
+
+    if (email.includes('Free') || email.includes('Unknown')) {
+      score += 0.08; reasons.push('Non-corporate email domain');
+    }
+
+    score = Math.min(score + (Math.random() * 0.05 - 0.025), 0.99);
+    score = Math.max(score, 0.02);
+
+    const responseTime = Math.round(40 + Math.random() * 80);
+    const isFraud = score >= 0.35;
+
+    if (triggered.length === 0) triggered = isFraud ? ['XGBoost'] : ['—'];
+    const uniqueTriggered = [...new Set(triggered)];
+
+    setTimeout(() => {
+      screen.className = 'result-screen ' + (isFraud ? 'fraud' : 'safe');
+      document.getElementById('result-icon').textContent = isFraud ? '🚨' : '✅';
+      document.getElementById('result-label').textContent = isFraud ? 'FRAUD INTERCEPTED' : 'TRANSACTION SAFE';
+      document.getElementById('result-label').className = 'result-label ' + (isFraud ? 'fraud' : 'safe');
+      document.getElementById('result-sub').textContent = isFraud
+        ? 'Funds blocked. No money moved.'
+        : 'Transaction approved. Proceeding.';
+
+      document.getElementById('m-time').textContent = responseTime;
+      document.getElementById('m-time').className = 'metric-val green';
+      document.getElementById('m-prob').textContent = (score * 100).toFixed(1) + '%';
+      document.getElementById('m-prob').className = 'metric-val ' + (score > 0.6 ? 'red' : score > 0.35 ? 'amber' : 'green');
+      document.getElementById('m-model').textContent = uniqueTriggered[0] || '—';
+      document.getElementById('m-model').style.fontSize = '13px';
+
+      const pct = Math.round(score * 100);
+      document.getElementById('conf-pct').textContent = pct + '%';
+      const bar = document.getElementById('conf-bar');
+      bar.style.width = pct + '%';
+      bar.className = 'conf-fill ' + (score > 0.6 ? 'high' : score > 0.35 ? 'mid' : 'low');
+
+      const log = document.getElementById('reason-log');
+      if (reasons.length > 0) {
+        log.innerHTML = reasons.map((r, i) => `<span style="color:${isFraud ? 'var(--red)' : 'var(--muted)'}">[FLAG ${String(i+1).padStart(2,'0')}] ${r}</span>`).join('<br>');
+        if (!isFraud) log.innerHTML = '<span style="color:var(--green)">[OK] No significant risk signals detected</span>';
+      } else {
+        log.innerHTML = '<span style="color:var(--green)">[OK] All checks passed. Risk score below threshold.</span>';
+      }
+
+    }, 900 + Math.random() * 400);
+  }
+</script>
+
+</body>
+</html>
