@@ -1,0 +1,110 @@
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_transaction.csv
+Sampling first 50000 rows for quick run
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_transaction.csv
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_identity.csv
+Merging on 'TransactionID' with a left join...
+
+Merged dataset shape (rows, columns):
+(50000, 434)
+
+First 5 rows of the merged dataset:
+   TransactionID  ...                     DeviceInfo
+0        2987000  ...                            NaN
+1        2987001  ...                            NaN
+2        2987002  ...                            NaN
+3        2987003  ...                            NaN
+4        2987004  ...  SAMSUNG SM-G892A Build/NRD90M
+
+[5 rows x 434 columns]
+
+Missing values per column:
+TransactionID         0
+isFraud               0
+TransactionDT         0
+TransactionAmt        0
+ProductCD             0
+                  ...  
+id_36             33931
+id_37             33931
+id_38             33931
+DeviceType        33932
+DeviceInfo        35649
+Length: 434, dtype: int64
+
+Percentage of transactions that are fraud:
+2.71%
+
+Saving merged dataset to: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\merged_fraud_data.csv
+Sampling first 50000 rows for quick run
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_transaction.csv
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_identity.csv
+Merging on 'TransactionID' with a left join...
+
+Merged dataset shape (rows, columns):
+(50000, 434)
+
+First 5 rows of the merged dataset:
+   TransactionID  ...                     DeviceInfo
+0        2987000  ...                            NaN
+1        2987001  ...                            NaN
+2        2987002  ...                            NaN
+3        2987003  ...                            NaN
+4        2987004  ...  SAMSUNG SM-G892A Build/NRD90M
+
+[5 rows x 434 columns]
+
+Missing values per column:
+TransactionID         0
+isFraud               0
+TransactionDT         0
+TransactionAmt        0
+ProductCD             0
+                  ...  
+id_36             33931
+id_37             33931
+id_38             33931
+DeviceType        33932
+DeviceInfo        35649
+Length: 434, dtype: int64
+
+Percentage of transactions that are fraud:
+2.71%
+
+Saving merged dataset to: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\merged_fraud_data.csv
+Loading: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\train_identity.csv
+Merging on 'TransactionID' with a left join...
+Save complete.
+
+Merged dataset shape (rows, columns):
+(590540, 434)
+
+First 5 rows of the merged dataset:
+   TransactionID  ...                     DeviceInfo
+0        2987000  ...                            NaN
+1        2987001  ...                            NaN
+2        2987002  ...                            NaN
+3        2987003  ...                            NaN
+4        2987004  ...  SAMSUNG SM-G892A Build/NRD90M
+
+[5 rows x 434 columns]
+
+Missing values per column:
+Save complete.
+TransactionID          0
+isFraud                0
+TransactionDT          0
+TransactionAmt         0
+ProductCD              0
+                   ...  
+id_36             449555
+id_37             449555
+id_38             449555
+DeviceType        449730
+DeviceInfo        471874
+Length: 434, dtype: int64
+
+Percentage of transactions that are fraud:
+3.50%
+
+Saving merged dataset to: C:\Users\admin\Documents\trae_projects\Fraud detection\BWT_Crimson\data\merged_fraud_data.csv
+Save complete.
